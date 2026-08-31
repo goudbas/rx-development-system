@@ -14,8 +14,10 @@
     --accent:#22c55e; --accent2:#3b82f6; --danger:#ef4444; --border:#334155;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#0b1220,#111827);color:var(--text);padding-bottom:76px}
-  .container{max-width:720px;margin:0 auto;padding:16px}
+  html,body{height:100%;overscroll-behavior:none}
+  body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#0b1220,#111827);color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+  .container{max-width:720px;margin:0 auto;padding:16px;width:100%}
+  #loginScreen.container,#app.container{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
   h1,h2,h3{margin:0 0 10px}
   p{color:var(--muted);margin:4px 0}
   label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
@@ -34,7 +36,7 @@
   .rec{margin-top:12px;padding:14px;border-radius:12px;background:#07111f;border:1px solid #1d4ed8}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
-  nav{position:fixed;bottom:0;left:0;right:0;background:#0b1220;border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  nav{flex:0 0 auto;background:#0b1220;border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
   nav button{flex:1;background:transparent;border:none;color:var(--muted);font-size:12px;margin:0;padding:8px 2px}
   nav button.active{color:var(--accent2);font-weight:700}
   .hidden{display:none}
@@ -42,6 +44,16 @@
   .tag{background:#0b1220;border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted)}
   #loginScreen{max-width:360px;margin:80px auto}
   .err{color:var(--danger);font-size:13px;min-height:18px}
+  .chip-group{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .chip{width:auto;flex:none;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:14px;font-weight:500;cursor:pointer;margin:0}
+  .chip.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+  .chip-group.scale .chip{padding:10px 14px;min-width:44px;text-align:center}
+  details{margin-top:16px}
+  details summary{cursor:pointer;color:var(--accent2);font-weight:600;padding:6px 0;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:'+ ';}
+  details[open] summary::before{content:'\2212 ';}
+  details .detail-body{padding-top:8px}
 </style>
 </head>
 <body>
@@ -65,47 +77,107 @@
     <h2>Today</h2>
 
     <div class="card">
-      <h3>Class load vandaag</h3>
-      <div class="row">
-        <div><label>Legs</label><select id="cl_legs"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
-        <div><label>Pulling</label><select id="cl_pulling"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+      <label>Hoe was de class? (overall)</label>
+      <div class="chip-group" data-field="overall_load">
+        <button type="button" class="chip" data-value="easy">easy</button>
+        <button type="button" class="chip" data-value="moderate">moderate</button>
+        <button type="button" class="chip" data-value="hard">hard</button>
+        <button type="button" class="chip" data-value="very_hard">very hard</button>
       </div>
-      <div class="row">
-        <div><label>Pushing</label><select id="cl_pushing"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
-        <div><label>Overhead</label><select id="cl_overhead"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>Gymnastics</label><select id="cl_gymnastics"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
-        <div><label>Conditioning</label><select id="cl_conditioning"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>Olympic lifting</label><select id="cl_oly"><option value="false">Nee</option><option value="true">Ja</option></select></div>
-        <div><label>Overall load</label><select id="cl_overall"><option value="">-</option><option value="easy">easy</option><option value="moderate">moderate</option><option value="hard">hard</option><option value="very_hard">very hard</option></select></div>
-      </div>
-      <button id="saveClassLoad">Class load opslaan</button>
-    </div>
 
-    <div class="card">
-      <h3>Hoe voel je je?</h3>
-      <div class="row">
-        <div><label>Readiness (1-5)</label><input id="rd_readiness" type="number" min="1" max="5" /></div>
-        <div><label>Fatigue (1-5)</label><input id="rd_fatigue" type="number" min="1" max="5" /></div>
+      <label>Hoe voel je je? (readiness)</label>
+      <div class="chip-group scale" data-field="readiness">
+        <button type="button" class="chip" data-value="1">1</button>
+        <button type="button" class="chip" data-value="2">2</button>
+        <button type="button" class="chip" data-value="3">3</button>
+        <button type="button" class="chip" data-value="4">4</button>
+        <button type="button" class="chip" data-value="5">5</button>
       </div>
-      <div class="row">
-        <div><label>Soreness (1-5)</label><input id="rd_soreness" type="number" min="1" max="5" /></div>
-        <div><label>Slaap (1-5)</label><input id="rd_sleep" type="number" min="1" max="5" /></div>
-      </div>
+
       <label>Pijn/irritatie</label>
-      <select id="rd_pain_level"><option value="none">Geen</option><option value="mild">Mild</option><option value="significant">Significant</option></select>
-      <label>Locatie (indien van toepassing)</label>
-      <input id="rd_pain_location" type="text" placeholder="bv. schouder" />
-      <button id="saveReadiness">Readiness opslaan</button>
+      <div class="chip-group" data-field="pain_level">
+        <button type="button" class="chip active" data-value="none">geen</button>
+        <button type="button" class="chip" data-value="mild">mild</button>
+        <button type="button" class="chip" data-value="significant">significant</button>
+      </div>
+      <input id="today_pain_location" type="text" placeholder="locatie, bv. schouder" class="hidden" style="margin-top:8px" />
+
+      <details>
+        <summary>Meer detail (optioneel)</summary>
+        <div class="detail-body">
+          <label>Legs</label>
+          <div class="chip-group" data-field="legs">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Pulling</label>
+          <div class="chip-group" data-field="pulling">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Pushing</label>
+          <div class="chip-group" data-field="pushing">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Overhead</label>
+          <div class="chip-group" data-field="overhead">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Gymnastics</label>
+          <div class="chip-group" data-field="gymnastics">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Conditioning</label>
+          <div class="chip-group" data-field="conditioning">
+            <button type="button" class="chip" data-value="low">low</button>
+            <button type="button" class="chip" data-value="moderate">moderate</button>
+            <button type="button" class="chip" data-value="high">high</button>
+          </div>
+          <label>Olympic lifting</label>
+          <div class="chip-group" data-field="olympic_lifting">
+            <button type="button" class="chip active" data-value="false">nee</button>
+            <button type="button" class="chip" data-value="true">ja</button>
+          </div>
+          <label>Fatigue</label>
+          <div class="chip-group scale" data-field="fatigue">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+          <label>Soreness</label>
+          <div class="chip-group scale" data-field="soreness">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+          <label>Slaap</label>
+          <div class="chip-group scale" data-field="sleep">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+        </div>
+      </details>
+
+      <button id="logTodayBtn">Log &amp; advies</button>
     </div>
 
     <div class="card">
-      <h3>Aanbeveling</h3>
-      <div id="recommendation" class="rec">Vul class load en readiness in, en klik hieronder.</div>
-      <button id="getRecommendation" class="secondary">Bereken aanbeveling</button>
+      <div id="recommendation" class="rec">Vul hierboven in en druk op "Log &amp; advies".</div>
     </div>
   </section>
 
@@ -135,18 +207,22 @@
     <h2>Skills</h2>
     <div id="skillCards">Laden...</div>
     <div class="card">
-      <h3>Sessie loggen</h3>
-      <label>Skill</label>
-      <select id="sk_skill"></select>
-      <label>Stap / progressie</label>
-      <input id="sk_step" type="text" placeholder="bv. band-assisted RMU 5x2" />
-      <div class="row">
-        <div><label>Kwaliteit (1-5)</label><input id="sk_quality" type="number" min="1" max="5" /></div>
-        <div><label>Succes %</label><input id="sk_success" type="number" min="0" max="100" /></div>
-      </div>
-      <label>Notities</label>
-      <input id="sk_notes" type="text" />
-      <button id="logSkillSession">Skill sessie opslaan</button>
+      <details>
+        <summary>Uitgebreide sessie loggen (stap, kwaliteit, notities)</summary>
+        <div class="detail-body">
+          <label>Skill</label>
+          <select id="sk_skill"></select>
+          <label>Stap / progressie</label>
+          <input id="sk_step" type="text" placeholder="bv. band-assisted RMU 5x2" />
+          <div class="row">
+            <div><label>Kwaliteit (1-5)</label><input id="sk_quality" type="number" min="1" max="5" /></div>
+            <div><label>Succes %</label><input id="sk_success" type="number" min="0" max="100" /></div>
+          </div>
+          <label>Notities</label>
+          <input id="sk_notes" type="text" />
+          <button id="logSkillSession">Skill sessie opslaan</button>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -178,6 +254,90 @@ const SKILL_TARGETS = {
   'Toes-to-Bar': { target: 15, unit: 'ongebroken reps' },
   'Butterfly Pull-up': { target: 15, unit: 'ongebroken reps' }
 };
+
+// Concrete inhoud per component — wat je daadwerkelijk moet doen (uit Deel 7/Trainingblokken).
+const BLOCK_CONTENT = {
+  'Ring Muscle-Up': {
+    duration: '15 min, vóór de class',
+    steps: ['False grip hang — 3×20 sec', 'Low ring transitions — 4×5', 'Band/feet assisted RMU — 5×2', 'Ring support hold — 3×30 sec'],
+    goal: '3-5 ongebroken RMU. Let op: bevriest bij "ring support hold" tot schouder 2 weken pijnvrij is.'
+  },
+  'Handstand Walk': {
+    duration: '15 min, vóór de class',
+    steps: ['Wall walks — 3×3', 'Shoulder taps — 3×20', 'Freestanding balance / walk attempts — 10 min'],
+    goal: '15-20 meter ononderbroken.'
+  },
+  'Double Unders': {
+    duration: '10 min',
+    steps: ['100 perfecte singles', '10 rondes: 10 DU pogingen', 'Stop zodra de techniek verslechtert'],
+    goal: '75-100 ongebroken.'
+  },
+  'Toes-to-Bar': {
+    duration: '10-12 min',
+    steps: ['EMOM 10: 5-7 perfecte TTB'],
+    goal: '20+ ongebroken TTB.'
+  },
+  'Butterfly Pull-up': {
+    duration: '8-10 min (onderhoud)',
+    steps: ['Butterfly drill — 4×8-12'],
+    goal: 'Al beheerst — onderhoudsvolume.'
+  },
+  'Strength': {
+    duration: '20-30 min, ná de class',
+    steps: ['Sessie A: Front Squat 5×5, Weighted Pull-up 5×5', 'Sessie B: Strict Press 5×5, Romanian Deadlift 4×8'],
+    goal: '+10-15 kg front squat, duidelijk sterkere pulling strength.'
+  },
+  'Mobility': {
+    duration: '8-10 min',
+    steps: ['Banded external rotation — 2×20', 'Face pull — 2×20', 'Scap push-up — 2×15', 'Dead hang — 2×45 sec', 'Thoracic extension — 2 min', 'Lat stretch — 2 min'],
+    goal: 'Dagelijkse schouder-stability.'
+  }
+};
+
+function contentHtml(component) {
+  const c = BLOCK_CONTENT[component];
+  if (!c) return '';
+  return `<div style="margin-top:10px">
+    ${c.duration ? `<span class="tag">${c.duration}</span>` : ''}
+    <ul style="margin:10px 0 0 18px;padding:0">${c.steps.map(s => `<li>${s}</li>`).join('')}</ul>
+    ${c.goal ? `<p style="margin-top:8px"><strong>Doel:</strong> ${c.goal}</p>` : ''}
+  </div>`;
+}
+function doneButtonHtml(component) {
+  const trackable = component && (skillsCache.some(s => s.name === component) || component === 'Strength');
+  return trackable ? `<button class="markDoneBtn secondary" data-component="${component}" style="margin-top:14px">✓ Gedaan vandaag</button>` : '';
+}
+
+// ---------- Eén-tik afvinken (Skills, Block, Today advies) ----------
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.markDoneBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Opslaan...';
+  await markComponentDone(btn.dataset.component);
+  btn.textContent = '✓ Gelogd';
+  if (btn.closest('#tab-block')) renderBlock();
+  if (btn.closest('#tab-skills')) renderSkills();
+  if (btn.closest('#tab-today')) renderRecommendation();
+  if (btn.closest('#tab-dashboard')) renderDashboard();
+});
+
+async function markComponentDone(component) {
+  const { data: { user } } = await sb.auth.getUser();
+  const today = localDateStr();
+  const skill = skillsCache.find(s => s.name === component);
+  if (skill) {
+    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today });
+    const { data: existing } = await sb.from('skill_progressions').select('current_step').eq('user_id', user.id).eq('skill_id', skill.id).maybeSingle();
+    await sb.from('skill_progressions').upsert({
+      user_id: user.id, skill_id: skill.id, current_step: existing?.current_step || '', last_session_date: today
+    }, { onConflict: 'user_id,skill_id' });
+  } else if (component === 'Strength') {
+    await sb.from('strength_sessions').insert({ user_id: user.id, date: today, exercise: 'Quick log' });
+  }
+  await bumpWeeklyTarget(user.id, component);
+}
 
 function localDateStr(d = new Date()) {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
@@ -240,44 +400,76 @@ function switchTab(tab) {
   if (tab === 'block') renderBlock();
 }
 
-// ---------- Today: class load ----------
-document.getElementById('saveClassLoad').addEventListener('click', async () => {
-  const today = localDateStr();
-  const { data: { user } } = await sb.auth.getUser();
-  const { data: session, error: sErr } = await sb.from('training_sessions')
-    .insert({ user_id: user.id, date: today, session_type: 'class' })
-    .select().single();
-  if (sErr) { alert(sErr.message); return; }
-  const payload = {
-    user_id: user.id,
-    training_session_id: session.id,
-    legs: val('cl_legs'), pulling: val('cl_pulling'), pushing: val('cl_pushing'),
-    overhead: val('cl_overhead'), gymnastics: val('cl_gymnastics'),
-    olympic_lifting: val('cl_oly') === 'true', conditioning: val('cl_conditioning'),
-    overall_load: val('cl_overall')
-  };
-  const { error } = await sb.from('class_loads').insert(payload);
-  if (error) alert(error.message); else alert('Class load opgeslagen.');
-});
-
-// ---------- Today: readiness ----------
-document.getElementById('saveReadiness').addEventListener('click', async () => {
-  const { data: { user } } = await sb.auth.getUser();
-  const payload = {
-    user_id: user.id, date: localDateStr(),
-    readiness: numval('rd_readiness'), fatigue: numval('rd_fatigue'),
-    soreness: numval('rd_soreness'), sleep: numval('rd_sleep'),
-    pain_level: val('rd_pain_level'), pain_location: val('rd_pain_location')
-  };
-  const { error } = await sb.from('daily_logs').upsert(payload, { onConflict: 'user_id,date' });
-  if (error) alert(error.message); else alert('Readiness opgeslagen.');
-});
-
 function val(id) { return document.getElementById(id).value || null; }
 function numval(id) { const v = document.getElementById(id).value; return v === '' ? null : Number(v); }
 
+// ---------- Today: chip state ----------
+const todayState = {
+  overall_load: null, readiness: null, pain_level: 'none', pain_location: '',
+  legs: null, pulling: null, pushing: null, overhead: null, gymnastics: null, conditioning: null,
+  olympic_lifting: 'false', fatigue: null, soreness: null, sleep: null
+};
+
+document.querySelectorAll('#tab-today .chip-group').forEach(group => {
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const field = group.dataset.field;
+    todayState[field] = btn.dataset.value;
+    if (field === 'pain_level') {
+      document.getElementById('today_pain_location').classList.toggle('hidden', btn.dataset.value === 'none');
+    }
+  });
+});
+document.getElementById('today_pain_location').addEventListener('input', (e) => {
+  todayState.pain_location = e.target.value;
+});
+
+// ---------- Today: log + advies in één actie ----------
+document.getElementById('logTodayBtn').addEventListener('click', logToday);
+
+async function logToday() {
+  const out = document.getElementById('recommendation');
+  out.textContent = 'Opslaan...';
+  const { data: { user } } = await sb.auth.getUser();
+  const today = localDateStr();
+
+  const detailFields = [todayState.legs, todayState.pulling, todayState.pushing, todayState.overhead, todayState.gymnastics, todayState.conditioning];
+  const hasClassData = todayState.overall_load || detailFields.some(Boolean);
+
+  if (hasClassData) {
+    const { data: session, error: sErr } = await sb.from('training_sessions')
+      .insert({ user_id: user.id, date: today, session_type: 'class' }).select().single();
+    if (sErr) { out.textContent = sErr.message; return; }
+    const clPayload = {
+      user_id: user.id, training_session_id: session.id,
+      legs: todayState.legs, pulling: todayState.pulling, pushing: todayState.pushing,
+      overhead: todayState.overhead, gymnastics: todayState.gymnastics,
+      olympic_lifting: todayState.olympic_lifting === 'true',
+      conditioning: todayState.conditioning, overall_load: todayState.overall_load
+    };
+    const { error: clErr } = await sb.from('class_loads').insert(clPayload);
+    if (clErr) { out.textContent = clErr.message; return; }
+  }
+
+  const logPayload = {
+    user_id: user.id, date: today,
+    readiness: todayState.readiness ? Number(todayState.readiness) : null,
+    fatigue: todayState.fatigue ? Number(todayState.fatigue) : null,
+    soreness: todayState.soreness ? Number(todayState.soreness) : null,
+    sleep: todayState.sleep ? Number(todayState.sleep) : null,
+    pain_level: todayState.pain_level, pain_location: todayState.pain_location || null
+  };
+  const { error: lErr } = await sb.from('daily_logs').upsert(logPayload, { onConflict: 'user_id,date' });
+  if (lErr) { out.textContent = lErr.message; return; }
+
+  await renderRecommendation();
+}
+
 // ---------- Daily Decision Engine (v1 heuristic, Deel 6) ----------
-document.getElementById('getRecommendation').addEventListener('click', async () => {
+async function renderRecommendation() {
   const out = document.getElementById('recommendation');
   out.textContent = 'Berekenen...';
   const { data: { user } } = await sb.auth.getUser();
@@ -290,13 +482,14 @@ document.getElementById('getRecommendation').addEventListener('click', async () 
 
   // Hard stop
   if (logToday?.pain_level === 'significant') {
-    out.innerHTML = `<strong>Recovery.</strong> Significante pijn gemeld (${logToday.pain_location || 'onbekende locatie'}) — geen extra belastend werk vandaag.`;
+    out.innerHTML = `<strong>Recovery</strong>
+      <p style="margin-top:4px">Significante pijn gemeld (${logToday.pain_location || 'onbekende locatie'}) — geen extra belastend werk vandaag.</p>`;
     return;
   }
 
   const block = await getActiveBlock(user.id);
   if (!block) {
-    out.innerHTML = `Geen actief trainingsblok. Ga naar <strong>Block</strong> om er een aan te maken — dan kan ik targets meewegen.`;
+    out.innerHTML = `Opgeslagen. Geen actief trainingsblok — ga naar <strong>Block</strong> om er een aan te maken, dan kan ik targets meewegen.`;
     return;
   }
   const weekNum = currentWeekNumber(block);
@@ -306,7 +499,9 @@ document.getElementById('getRecommendation').addEventListener('click', async () 
   const mildPainShoulder = logToday?.pain_level === 'mild' && (logToday.pain_location || '').toLowerCase().includes('schouder');
 
   if (mildPainShoulder && shoulderLoadedToday) {
-    out.innerHTML = `<strong>Mobility/Stability.</strong> Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability, geen extra belastend werk op die regio.`;
+    out.innerHTML = `<strong>Mobility/Stability</strong>
+      <p style="margin-top:4px">Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability.</p>
+      ${contentHtml('Mobility')}`;
     return;
   }
 
@@ -315,7 +510,7 @@ document.getElementById('getRecommendation').addEventListener('click', async () 
     .sort((a, b) => (a.actual_count / Math.max(a.target_min, 1)) - (b.actual_count / Math.max(b.target_min, 1)));
 
   if (under.length === 0) {
-    out.innerHTML = `<strong>Recovery.</strong> Alle weekly targets van dit blok zijn deze week al gehaald.`;
+    out.innerHTML = `<strong>Recovery</strong><p style="margin-top:4px">Alle weekly targets van dit blok zijn deze week al gehaald.</p>`;
     return;
   }
 
@@ -328,13 +523,18 @@ document.getElementById('getRecommendation').addEventListener('click', async () 
   if (componentIsShoulderSensitive && (mildPainShoulder || shoulderLoadedToday)) {
     pick = under.find(t => t.component !== pick.component) || null;
     if (!pick) {
-      out.innerHTML = `<strong>Mobility/Stability.</strong> Belangrijkste open target vraagt schouderbelasting die vandaag niet verstandig is — kies bewust voor herstel/mobility.`;
+      out.innerHTML = `<strong>Mobility/Stability</strong>
+        <p style="margin-top:4px">Belangrijkste open target vraagt schouderbelasting die vandaag niet verstandig is — kies bewust voor herstel/mobility.</p>
+        ${contentHtml('Mobility')}`;
       return;
     }
   }
 
-  out.innerHTML = `<strong>${pick.component}</strong> — meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}). ${cl ? `Class load vandaag: overhead ${cl.overhead || '-'}, pulling ${cl.pulling || '-'}, overall ${cl.overall_load || '-'}.` : ''}`;
-});
+  out.innerHTML = `<strong>${pick.component}</strong>
+    <p style="margin-top:4px">Meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}).${cl ? ` Class load vandaag: overhead ${cl.overhead || '-'}, pulling ${cl.pulling || '-'}, overall ${cl.overall_load || '-'}.` : ''}</p>
+    ${contentHtml(pick.component)}
+    ${doneButtonHtml(pick.component)}`;
+}
 
 async function getActiveBlock(userId) {
   const { data } = await sb.from('training_blocks').select('*').eq('user_id', userId).eq('status', 'active').order('start_date', { ascending: false }).limit(1).maybeSingle();
@@ -370,7 +570,10 @@ async function renderDashboard() {
     </div>`).join('');
   const limiter = rows[0];
   document.getElementById('limiter').innerHTML = limiter
-    ? `<strong>${limiter.name}</strong> (${limiter.pct}% van RX-ready criterium). Voeg benchmarks toe via de Skills-tab om dit nauwkeuriger te maken.`
+    ? `<strong>${limiter.name}</strong> (${limiter.pct}% van RX-ready criterium).
+       ${contentHtml(limiter.name)}
+       ${doneButtonHtml(limiter.name)}
+       <p style="margin-top:8px;font-size:13px">Voeg benchmarks toe via de Skills-tab om dit nauwkeuriger te maken.</p>`
     : 'Nog geen benchmarks gelogd.';
 }
 
@@ -410,8 +613,9 @@ async function renderSkills() {
   container.innerHTML = skillsCache.map(s => {
     const p = progressions?.find(x => x.skill_id === s.id);
     return `<div class="card"><h3>${s.name}</h3>
-      <p>Huidige stap: ${p?.current_step || '<em>nog niet gestart</em>'}</p>
-      <p>Laatste sessie: ${p?.last_session_date || '-'} · Succes: ${p?.success_rate ?? '-'}%</p>
+      <p>Huidige stap: ${p?.current_step || '<em>nog niet gestart</em>'} · laatste sessie: ${p?.last_session_date || '-'}</p>
+      ${contentHtml(s.name)}
+      ${doneButtonHtml(s.name)}
     </div>`;
   }).join('');
 }
@@ -480,9 +684,16 @@ async function renderBlock() {
     <div class="tag-row"><span class="tag">Week ${weekNum}</span></div>
   </div>
   <div class="card"><h3>Weekly targets — deze week</h3>
-    ${(targets || []).map(t => `<div style="margin:10px 0">
-      <div class="row" style="justify-content:space-between"><strong>${t.component}</strong><span>${t.actual_count}/${t.target_min}-${t.target_max}</span></div>
+    ${(targets || []).map(t => `<div style="margin:14px 0">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <strong>${t.component}</strong>
+        <div class="row" style="flex:none;align-items:center;gap:8px">
+          <span style="flex:none">${t.actual_count}/${t.target_min}-${t.target_max}</span>
+          <button class="markDoneBtn small" style="flex:none" data-component="${t.component}">✓</button>
+        </div>
+      </div>
       <div class="bar"><div style="width:${Math.min(100, Math.round(t.actual_count / Math.max(t.target_min,1) * 100))}%"></div></div>
+      ${BLOCK_CONTENT[t.component] ? `<details><summary>Wat doe ik?</summary><div class="detail-body">${contentHtml(t.component)}</div></details>` : ''}
     </div>`).join('') || '<p>Geen targets voor deze week.</p>'}
   </div>`;
 }
