@@ -1,4 +1,4 @@
-const CACHE = 'rx-dev-v1';
+const CACHE = 'rx-dev-v2';
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -13,13 +13,15 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
+// Network-first: altijd de nieuwste versie ophalen als er verbinding is,
+// alleen terugvallen op cache wanneer offline.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).then((res) => {
+    fetch(e.request).then((res) => {
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy));
       return res;
-    }).catch(() => cached))
+    }).catch(() => caches.match(e.request))
   );
 });
