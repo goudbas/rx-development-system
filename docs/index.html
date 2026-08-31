@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>RX Development System</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0f172a" />
+<link rel="icon" href="icon.svg" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8;
+    --accent:#22c55e; --accent2:#3b82f6; --danger:#ef4444; --border:#334155;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#0b1220,#111827);color:var(--text);padding-bottom:76px}
+  .container{max-width:720px;margin:0 auto;padding:16px}
+  h1,h2,h3{margin:0 0 10px}
+  p{color:var(--muted);margin:4px 0}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  select,input,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:15px}
+  button{background:var(--accent2);border:none;font-weight:600;cursor:pointer;margin-top:12px}
+  button.secondary{background:#334155}
+  button.small{width:auto;padding:6px 10px;margin:0;font-size:13px}
+  .card{background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:14px;padding:16px;margin:14px 0;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge.ok{background:rgba(34,197,94,.15);color:var(--accent)}
+  .badge.warn{background:rgba(239,68,68,.15);color:var(--danger)}
+  .bar{width:100%;height:10px;background:#1e293b;border-radius:999px;overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--accent),#84cc16)}
+  .rec{margin-top:12px;padding:14px;border-radius:12px;background:#07111f;border:1px solid #1d4ed8}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+  nav{position:fixed;bottom:0;left:0;right:0;background:#0b1220;border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  nav button{flex:1;background:transparent;border:none;color:var(--muted);font-size:12px;margin:0;padding:8px 2px}
+  nav button.active{color:var(--accent2);font-weight:700}
+  .hidden{display:none}
+  .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .tag{background:#0b1220;border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted)}
+  #loginScreen{max-width:360px;margin:80px auto}
+  .err{color:var(--danger);font-size:13px;min-height:18px}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="container hidden">
+  <div class="card">
+    <h1>RX Development System</h1>
+    <p>Log in met je persoonlijke account.</p>
+    <label>E-mail</label>
+    <input id="loginEmail" type="email" autocomplete="username" />
+    <label>Wachtwoord</label>
+    <input id="loginPassword" type="password" autocomplete="current-password" />
+    <div id="loginErr" class="err"></div>
+    <button id="loginBtn">Inloggen</button>
+  </div>
+</div>
+
+<div id="app" class="container hidden">
+
+  <section id="tab-today" class="tabpane">
+    <h2>Today</h2>
+
+    <div class="card">
+      <h3>Class load vandaag</h3>
+      <div class="row">
+        <div><label>Legs</label><select id="cl_legs"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+        <div><label>Pulling</label><select id="cl_pulling"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Pushing</label><select id="cl_pushing"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+        <div><label>Overhead</label><select id="cl_overhead"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Gymnastics</label><select id="cl_gymnastics"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+        <div><label>Conditioning</label><select id="cl_conditioning"><option value="">-</option><option>low</option><option>moderate</option><option>high</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Olympic lifting</label><select id="cl_oly"><option value="false">Nee</option><option value="true">Ja</option></select></div>
+        <div><label>Overall load</label><select id="cl_overall"><option value="">-</option><option value="easy">easy</option><option value="moderate">moderate</option><option value="hard">hard</option><option value="very_hard">very hard</option></select></div>
+      </div>
+      <button id="saveClassLoad">Class load opslaan</button>
+    </div>
+
+    <div class="card">
+      <h3>Hoe voel je je?</h3>
+      <div class="row">
+        <div><label>Readiness (1-5)</label><input id="rd_readiness" type="number" min="1" max="5" /></div>
+        <div><label>Fatigue (1-5)</label><input id="rd_fatigue" type="number" min="1" max="5" /></div>
+      </div>
+      <div class="row">
+        <div><label>Soreness (1-5)</label><input id="rd_soreness" type="number" min="1" max="5" /></div>
+        <div><label>Slaap (1-5)</label><input id="rd_sleep" type="number" min="1" max="5" /></div>
+      </div>
+      <label>Pijn/irritatie</label>
+      <select id="rd_pain_level"><option value="none">Geen</option><option value="mild">Mild</option><option value="significant">Significant</option></select>
+      <label>Locatie (indien van toepassing)</label>
+      <input id="rd_pain_location" type="text" placeholder="bv. schouder" />
+      <button id="saveReadiness">Readiness opslaan</button>
+    </div>
+
+    <div class="card">
+      <h3>Aanbeveling</h3>
+      <div id="recommendation" class="rec">Vul class load en readiness in, en klik hieronder.</div>
+      <button id="getRecommendation" class="secondary">Bereken aanbeveling</button>
+    </div>
+  </section>
+
+  <section id="tab-dashboard" class="tabpane hidden">
+    <h2>Dashboard</h2>
+    <div class="card">
+      <h3>RX Readiness per skill</h3>
+      <div id="readinessList">Laden...</div>
+    </div>
+    <div class="card">
+      <h3>Grootste limiter</h3>
+      <div id="limiter" class="rec">-</div>
+    </div>
+  </section>
+
+  <section id="tab-log" class="tabpane hidden">
+    <h2>Training log</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Datum</th><th>Type</th><th>Detail</th></tr></thead>
+        <tbody id="logRows"><tr><td colspan="3">Laden...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-skills" class="tabpane hidden">
+    <h2>Skills</h2>
+    <div id="skillCards">Laden...</div>
+    <div class="card">
+      <h3>Sessie loggen</h3>
+      <label>Skill</label>
+      <select id="sk_skill"></select>
+      <label>Stap / progressie</label>
+      <input id="sk_step" type="text" placeholder="bv. band-assisted RMU 5x2" />
+      <div class="row">
+        <div><label>Kwaliteit (1-5)</label><input id="sk_quality" type="number" min="1" max="5" /></div>
+        <div><label>Succes %</label><input id="sk_success" type="number" min="0" max="100" /></div>
+      </div>
+      <label>Notities</label>
+      <input id="sk_notes" type="text" />
+      <button id="logSkillSession">Skill sessie opslaan</button>
+    </div>
+  </section>
+
+  <section id="tab-block" class="tabpane hidden">
+    <h2>Current Block</h2>
+    <div id="blockView">Laden...</div>
+  </section>
+
+  <button id="logoutBtn" class="secondary" style="max-width:720px;margin:20px auto;display:block">Uitloggen</button>
+</div>
+
+<nav id="navbar" class="hidden">
+  <button data-tab="today" class="active">Today</button>
+  <button data-tab="dashboard">Dashboard</button>
+  <button data-tab="log">Log</button>
+  <button data-tab="skills">Skills</button>
+  <button data-tab="block">Block</button>
+</nav>
+
+<script>
+const SUPABASE_URL = 'https://deujtrqudsmuzvthijrt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WzaOcwepcapln9AyyiE1Nw_LPoagKP3';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SKILL_TARGETS = {
+  'Double Unders': { target: 75, unit: 'ongebroken reps' },
+  'Handstand Walk': { target: 15, unit: 'meter' },
+  'Ring Muscle-Up': { target: 3, unit: 'ongebroken reps' },
+  'Toes-to-Bar': { target: 15, unit: 'ongebroken reps' },
+  'Butterfly Pull-up': { target: 15, unit: 'ongebroken reps' }
+};
+
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function weekStartStr(d = new Date()) {
+  const day = d.getDay() === 0 ? 7 : d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day - 1));
+  return localDateStr(monday);
+}
+
+let skillsCache = [];
+
+// ---------- Auth ----------
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { showApp(); } else { showLogin(); }
+  sb.auth.onAuthStateChange((_event, session) => {
+    if (session) showApp(); else showLogin();
+  });
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('navbar').classList.add('hidden');
+}
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('navbar').classList.remove('hidden');
+  loadSkills();
+  switchTab('today');
+}
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) errEl.textContent = error.message;
+});
+document.getElementById('logoutBtn').addEventListener('click', () => sb.auth.signOut());
+
+// ---------- Nav ----------
+document.getElementById('navbar').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  switchTab(btn.dataset.tab);
+});
+function switchTab(tab) {
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+  document.querySelectorAll('#navbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'log') renderLog();
+  if (tab === 'skills') renderSkills();
+  if (tab === 'block') renderBlock();
+}
+
+// ---------- Today: class load ----------
+document.getElementById('saveClassLoad').addEventListener('click', async () => {
+  const today = localDateStr();
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: session, error: sErr } = await sb.from('training_sessions')
+    .insert({ user_id: user.id, date: today, session_type: 'class' })
+    .select().single();
+  if (sErr) { alert(sErr.message); return; }
+  const payload = {
+    user_id: user.id,
+    training_session_id: session.id,
+    legs: val('cl_legs'), pulling: val('cl_pulling'), pushing: val('cl_pushing'),
+    overhead: val('cl_overhead'), gymnastics: val('cl_gymnastics'),
+    olympic_lifting: val('cl_oly') === 'true', conditioning: val('cl_conditioning'),
+    overall_load: val('cl_overall')
+  };
+  const { error } = await sb.from('class_loads').insert(payload);
+  if (error) alert(error.message); else alert('Class load opgeslagen.');
+});
+
+// ---------- Today: readiness ----------
+document.getElementById('saveReadiness').addEventListener('click', async () => {
+  const { data: { user } } = await sb.auth.getUser();
+  const payload = {
+    user_id: user.id, date: localDateStr(),
+    readiness: numval('rd_readiness'), fatigue: numval('rd_fatigue'),
+    soreness: numval('rd_soreness'), sleep: numval('rd_sleep'),
+    pain_level: val('rd_pain_level'), pain_location: val('rd_pain_location')
+  };
+  const { error } = await sb.from('daily_logs').upsert(payload, { onConflict: 'user_id,date' });
+  if (error) alert(error.message); else alert('Readiness opgeslagen.');
+});
+
+function val(id) { return document.getElementById(id).value || null; }
+function numval(id) { const v = document.getElementById(id).value; return v === '' ? null : Number(v); }
+
+// ---------- Daily Decision Engine (v1 heuristic, Deel 6) ----------
+document.getElementById('getRecommendation').addEventListener('click', async () => {
+  const out = document.getElementById('recommendation');
+  out.textContent = 'Berekenen...';
+  const { data: { user } } = await sb.auth.getUser();
+  const today = localDateStr();
+
+  const { data: logToday } = await sb.from('daily_logs').select('*').eq('user_id', user.id).eq('date', today).maybeSingle();
+  const { data: sessionsToday } = await sb.from('training_sessions').select('id, class_loads(*)').eq('user_id', user.id).eq('date', today);
+  const classLoadToday = sessionsToday?.find(s => s.class_loads?.length)?.class_loads?.[0] || sessionsToday?.[0]?.class_loads || null;
+  const cl = Array.isArray(classLoadToday) ? classLoadToday[0] : classLoadToday;
+
+  // Hard stop
+  if (logToday?.pain_level === 'significant') {
+    out.innerHTML = `<strong>Recovery.</strong> Significante pijn gemeld (${logToday.pain_location || 'onbekende locatie'}) — geen extra belastend werk vandaag.`;
+    return;
+  }
+
+  const block = await getActiveBlock(user.id);
+  if (!block) {
+    out.innerHTML = `Geen actief trainingsblok. Ga naar <strong>Block</strong> om er een aan te maken — dan kan ik targets meewegen.`;
+    return;
+  }
+  const weekNum = currentWeekNumber(block);
+  const { data: targets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
+
+  const shoulderLoadedToday = cl && (cl.overhead === 'high' || cl.pulling === 'high');
+  const mildPainShoulder = logToday?.pain_level === 'mild' && (logToday.pain_location || '').toLowerCase().includes('schouder');
+
+  if (mildPainShoulder && shoulderLoadedToday) {
+    out.innerHTML = `<strong>Mobility/Stability.</strong> Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability, geen extra belastend werk op die regio.`;
+    return;
+  }
+
+  const under = (targets || [])
+    .filter(t => t.actual_count < t.target_min)
+    .sort((a, b) => (a.actual_count / Math.max(a.target_min, 1)) - (b.actual_count / Math.max(b.target_min, 1)));
+
+  if (under.length === 0) {
+    out.innerHTML = `<strong>Recovery.</strong> Alle weekly targets van dit blok zijn deze week al gehaald.`;
+    return;
+  }
+
+  let pick = under[0];
+  // avoid stacking region already loaded hard in class today
+  if (pick.component === 'Strength' && cl?.overall_load === 'very_hard') {
+    pick = under.find(t => t.component !== 'Strength') || pick;
+  }
+  const componentIsShoulderSensitive = ['Ring Muscle-Up'].includes(pick.component);
+  if (componentIsShoulderSensitive && (mildPainShoulder || shoulderLoadedToday)) {
+    pick = under.find(t => t.component !== pick.component) || null;
+    if (!pick) {
+      out.innerHTML = `<strong>Mobility/Stability.</strong> Belangrijkste open target vraagt schouderbelasting die vandaag niet verstandig is — kies bewust voor herstel/mobility.`;
+      return;
+    }
+  }
+
+  out.innerHTML = `<strong>${pick.component}</strong> — meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}). ${cl ? `Class load vandaag: overhead ${cl.overhead || '-'}, pulling ${cl.pulling || '-'}, overall ${cl.overall_load || '-'}.` : ''}`;
+});
+
+async function getActiveBlock(userId) {
+  const { data } = await sb.from('training_blocks').select('*').eq('user_id', userId).eq('status', 'active').order('start_date', { ascending: false }).limit(1).maybeSingle();
+  return data;
+}
+function currentWeekNumber(block) {
+  const start = new Date(block.start_date);
+  const diffDays = Math.floor((new Date() - start) / 86400000);
+  return Math.max(1, Math.floor(diffDays / 7) + 1);
+}
+
+// ---------- Dashboard ----------
+async function renderDashboard() {
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: benchmarks } = await sb.from('benchmarks').select('*').eq('user_id', user.id).order('date', { ascending: false });
+  const listEl = document.getElementById('readinessList');
+  const rows = [];
+  for (const name of Object.keys(SKILL_TARGETS)) {
+    const target = SKILL_TARGETS[name];
+    const latest = benchmarks?.find(b => b.name === name);
+    const value = latest ? Number(latest.value) : null;
+    const pct = value ? Math.min(100, Math.round((value / target.target) * 100)) : 0;
+    rows.push({ name, pct, value, target });
+  }
+  rows.sort((a, b) => a.pct - b.pct);
+  listEl.innerHTML = rows.map(r => `
+    <div style="margin:12px 0">
+      <div class="row" style="justify-content:space-between">
+        <strong>${r.name}</strong>
+        <span class="badge ${r.pct >= 100 ? 'ok' : 'warn'}">${r.value ?? '-'} / ${r.target.target} ${r.target.unit}</span>
+      </div>
+      <div class="bar"><div style="width:${r.pct}%"></div></div>
+    </div>`).join('');
+  const limiter = rows[0];
+  document.getElementById('limiter').innerHTML = limiter
+    ? `<strong>${limiter.name}</strong> (${limiter.pct}% van RX-ready criterium). Voeg benchmarks toe via de Skills-tab om dit nauwkeuriger te maken.`
+    : 'Nog geen benchmarks gelogd.';
+}
+
+// ---------- Log ----------
+async function renderLog() {
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: sessions } = await sb.from('training_sessions').select('*, class_loads(overall_load), skill_sessions(step, skills(name)), strength_sessions(exercise)')
+    .eq('user_id', user.id).order('date', { ascending: false }).limit(20);
+  const { data: logs } = await sb.from('daily_logs').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(20);
+  const rows = [];
+  (sessions || []).forEach(s => {
+    let detail = s.session_type;
+    if (s.class_loads?.[0]?.overall_load) detail += ` (${s.class_loads[0].overall_load})`;
+    if (s.skill_sessions?.length) detail += ' — ' + s.skill_sessions.map(x => x.skills?.name).join(', ');
+    if (s.strength_sessions?.length) detail += ' — ' + s.strength_sessions.map(x => x.exercise).join(', ');
+    rows.push({ date: s.date, type: 'sessie', detail });
+  });
+  (logs || []).forEach(l => rows.push({ date: l.date, type: 'readiness', detail: `R${l.readiness ?? '-'} F${l.fatigue ?? '-'} S${l.soreness ?? '-'} slaap${l.sleep ?? '-'} pijn:${l.pain_level ?? '-'}` }));
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  document.getElementById('logRows').innerHTML = rows.length
+    ? rows.map(r => `<tr><td>${r.date}</td><td>${r.type}</td><td>${r.detail}</td></tr>`).join('')
+    : '<tr><td colspan="3">Nog geen data.</td></tr>';
+}
+
+// ---------- Skills ----------
+async function loadSkills() {
+  const { data } = await sb.from('skills').select('*').order('name');
+  skillsCache = data || [];
+  const sel = document.getElementById('sk_skill');
+  sel.innerHTML = skillsCache.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+async function renderSkills() {
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: progressions } = await sb.from('skill_progressions').select('*, skills(name)').eq('user_id', user.id);
+  const container = document.getElementById('skillCards');
+  container.innerHTML = skillsCache.map(s => {
+    const p = progressions?.find(x => x.skill_id === s.id);
+    return `<div class="card"><h3>${s.name}</h3>
+      <p>Huidige stap: ${p?.current_step || '<em>nog niet gestart</em>'}</p>
+      <p>Laatste sessie: ${p?.last_session_date || '-'} · Succes: ${p?.success_rate ?? '-'}%</p>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('logSkillSession').addEventListener('click', async () => {
+  const { data: { user } } = await sb.auth.getUser();
+  const skillId = document.getElementById('sk_skill').value;
+  const step = val('sk_step');
+  const quality = numval('sk_quality');
+  const success = numval('sk_success');
+  const notes = val('sk_notes');
+  const today = localDateStr();
+
+  const { error: e1 } = await sb.from('skill_sessions').insert({
+    user_id: user.id, skill_id: skillId, date: today, step, quality_score: quality, success_pct: success, notes
+  });
+  if (e1) { alert(e1.message); return; }
+
+  await sb.from('skill_progressions').upsert({
+    user_id: user.id, skill_id: skillId, current_step: step, last_session_date: today, success_rate: success
+  }, { onConflict: 'user_id,skill_id' });
+
+  await bumpWeeklyTarget(user.id, skillsCache.find(s => s.id === skillId)?.name);
+  alert('Skill sessie opgeslagen.');
+  renderSkills();
+});
+
+async function bumpWeeklyTarget(userId, componentName) {
+  if (!componentName) return;
+  const block = await getActiveBlock(userId);
+  if (!block) return;
+  const weekNum = currentWeekNumber(block);
+  const { data: target } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum).eq('component', componentName).maybeSingle();
+  if (target) await sb.from('weekly_targets').update({ actual_count: target.actual_count + 1 }).eq('id', target.id);
+}
+
+// ---------- Block ----------
+async function renderBlock() {
+  const { data: { user } } = await sb.auth.getUser();
+  const block = await getActiveBlock(user.id);
+  const view = document.getElementById('blockView');
+  if (!block) {
+    view.innerHTML = `<div class="card">
+      <h3>Geen actief blok</h3>
+      <label>Startdatum</label><input id="nb_start" type="date" value="${localDateStr()}" />
+      <label>Duur (weken)</label><input id="nb_weeks" type="number" value="10" min="4" max="16" />
+      <label>Primary goals (komma-gescheiden)</label><input id="nb_primary" type="text" placeholder="Double Unders, Handstand Walk" />
+      <label>Secondary goals</label><input id="nb_secondary" type="text" placeholder="Schouder stability, onderhoud pulling" />
+      <label>Exit criteria</label><input id="nb_exit" type="text" placeholder="30+ DU ongebroken, 5m+ HSW" />
+      <h3 style="margin-top:16px">Weekly targets (min-max per week)</h3>
+      <div class="row"><div><label>Double Unders</label><input id="wt_du_min" type="number" value="2" /></div><div><label>max</label><input id="wt_du_max" type="number" value="4" /></div></div>
+      <div class="row"><div><label>Handstand Walk</label><input id="wt_hsw_min" type="number" value="1" /></div><div><label>max</label><input id="wt_hsw_max" type="number" value="3" /></div></div>
+      <div class="row"><div><label>Strength</label><input id="wt_str_min" type="number" value="0" /></div><div><label>max</label><input id="wt_str_max" type="number" value="2" /></div></div>
+      <button id="createBlock">Blok aanmaken</button>
+    </div>`;
+    document.getElementById('createBlock').addEventListener('click', createBlock);
+    return;
+  }
+  const weekNum = currentWeekNumber(block);
+  const { data: targets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
+  view.innerHTML = `<div class="card">
+    <h3>Actief blok sinds ${block.start_date}</h3>
+    <p><strong>Primary:</strong> ${(block.primary_goals || []).join(', ')}</p>
+    <p><strong>Secondary:</strong> ${(block.secondary_goals || []).join(', ')}</p>
+    <p><strong>Exit criteria:</strong> ${block.exit_criteria || '-'}</p>
+    <div class="tag-row"><span class="tag">Week ${weekNum}</span></div>
+  </div>
+  <div class="card"><h3>Weekly targets — deze week</h3>
+    ${(targets || []).map(t => `<div style="margin:10px 0">
+      <div class="row" style="justify-content:space-between"><strong>${t.component}</strong><span>${t.actual_count}/${t.target_min}-${t.target_max}</span></div>
+      <div class="bar"><div style="width:${Math.min(100, Math.round(t.actual_count / Math.max(t.target_min,1) * 100))}%"></div></div>
+    </div>`).join('') || '<p>Geen targets voor deze week.</p>'}
+  </div>`;
+}
+
+async function createBlock() {
+  const { data: { user } } = await sb.auth.getUser();
+  const start = val('nb_start');
+  const weeks = numval('nb_weeks');
+  const primary = val('nb_primary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+  const secondary = val('nb_secondary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+  const exit = val('nb_exit');
+
+  const { data: block, error } = await sb.from('training_blocks').insert({
+    user_id: user.id, start_date: start, primary_goals: primary, secondary_goals: secondary, exit_criteria: exit, status: 'active'
+  }).select().single();
+  if (error) { alert(error.message); return; }
+
+  const template = [
+    { component: 'Double Unders', min: numval('wt_du_min'), max: numval('wt_du_max') },
+    { component: 'Handstand Walk', min: numval('wt_hsw_min'), max: numval('wt_hsw_max') },
+    { component: 'Strength', min: numval('wt_str_min'), max: numval('wt_str_max') }
+  ];
+  const rows = [];
+  for (let w = 1; w <= weeks; w++) {
+    template.forEach(t => rows.push({ user_id: user.id, block_id: block.id, week_number: w, component: t.component, target_min: t.min, target_max: t.max, actual_count: 0 }));
+  }
+  const { error: e2 } = await sb.from('weekly_targets').insert(rows);
+  if (e2) alert(e2.message); else { alert('Blok aangemaakt.'); renderBlock(); }
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+init();
+</script>
+</body>
+</html>
