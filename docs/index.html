@@ -204,12 +204,18 @@
   <section id="tab-dashboard" class="tabpane hidden">
     <h2>Dashboard</h2>
     <div class="card">
-      <h3>RX Readiness per skill</h3>
+      <h3>RX Readiness — Skills</h3>
+      <p style="font-size:13px;margin-top:-4px">Tik op een skill om een nieuwe waarde te loggen.</p>
       <div id="readinessList">Laden...</div>
     </div>
     <div class="card">
       <h3>Grootste limiter</h3>
       <div id="limiter" class="rec">-</div>
+    </div>
+    <div class="card">
+      <h3>RX Readiness — Kracht</h3>
+      <p style="font-size:13px;margin-top:-4px">Tik op een lift om een nieuwe waarde te loggen.</p>
+      <div id="strengthList">Laden...</div>
     </div>
   </section>
 
@@ -232,8 +238,8 @@
         <div class="detail-body">
           <label>Skill</label>
           <select id="sk_skill"></select>
-          <label>Stap / progressie</label>
-          <input id="sk_step" type="text" placeholder="bv. band-assisted RMU 5x2" />
+          <label>Niveau</label>
+          <select id="sk_level"></select>
           <div class="row">
             <div><label>Kwaliteit (1-5)</label><input id="sk_quality" type="number" min="1" max="5" /></div>
             <div><label>Succes %</label><input id="sk_success" type="number" min="0" max="100" /></div>
@@ -273,9 +279,16 @@ function contentHtml(component) {
   const c = skillsCache.find(s => s.name === component);
   if (!c) return '';
   const timingLabel = c.timing === 'pre' ? 'vóór de class' : c.timing === 'post' ? 'ná de class' : null;
+  const levels = c.levels || [];
+  const curNum = progressionsCache[c.id] ?? 0;
+  const cur = levels.find(l => l.level_number === curNum) || levels[0];
+  const allLevelsHtml = levels.map(l => `<li>${l.level_number === curNum ? '<strong>→ ' : (l.level_number < curNum ? '✓ ' : '')}Niveau ${l.level_number + 1}: ${l.name}${l.level_number === curNum ? '</strong>' : ''}</li>`).join('');
   return `<div style="margin-top:10px">
     ${timingLabel ? `<span class="tag">${timingLabel}</span>` : ''}
-    <ul style="margin:10px 0 0 18px;padding:0">${(c.exercises || []).map(s => `<li>${s}</li>`).join('')}</ul>
+    ${cur ? `<p style="margin-top:8px"><strong>Niveau ${cur.level_number + 1}/${levels.length} — ${cur.name}</strong></p>
+    <ul style="margin:6px 0 0 18px;padding:0">${(cur.exercises || []).map(s => `<li>${s}</li>`).join('')}</ul>
+    ${cur.pass_criteria_text ? `<p style="margin-top:6px;font-size:13px"><strong>Slaagcriterium:</strong> ${cur.pass_criteria_text}</p>` : ''}` : ''}
+    ${levels.length > 1 ? `<details style="margin-top:8px"><summary>Alle niveaus</summary><ul style="margin:6px 0 0 18px;padding:0">${allLevelsHtml}</ul></details>` : ''}
     ${c.goal_text ? `<p style="margin-top:8px"><strong>Doel:</strong> ${c.goal_text}</p>` : ''}
   </div>`;
 }
@@ -302,8 +315,11 @@ document.addEventListener('click', async (e) => {
   if (!qBtn) return;
   const wrap = qBtn.parentElement;
   wrap.textContent = 'Opslaan...';
-  await markComponentDone(qBtn.dataset.component, Number(qBtn.dataset.quality));
+  const nextLevel = await markComponentDone(qBtn.dataset.component, Number(qBtn.dataset.quality));
   wrap.textContent = '✓ Gelogd';
+  // De tab-refreshes hieronder vervangen dit element meteen weer, dus een boodschap in wrap.textContent
+  // wordt nooit gezien — een level-up moet daarom via alert() (blokkerend, overleeft de re-render).
+  if (nextLevel) alert(`🎉 Level omhoog: ${nextLevel.name}`);
   if (wrap.closest('#tab-block')) renderBlock();
   if (wrap.closest('#tab-skills')) renderSkills();
   if (wrap.closest('#recommendationPre')) renderPreClassRecommendation(false);
@@ -311,18 +327,54 @@ document.addEventListener('click', async (e) => {
   if (wrap.closest('#tab-dashboard')) renderDashboard();
 });
 
+document.addEventListener('click', async (e) => {
+  const setBtn = e.target.closest('.setLevelBtn');
+  if (!setBtn) return;
+  const skillId = setBtn.dataset.skillId;
+  const select = document.querySelector(`.levelOverrideSelect[data-skill-id="${skillId}"]`);
+  const levelNumber = Number(select.value);
+  const { data: { user } } = await sb.auth.getUser();
+  await sb.from('skill_progressions').upsert({
+    user_id: user.id, skill_id: skillId, current_level_number: levelNumber
+  }, { onConflict: 'user_id,skill_id' });
+  progressionsCache[skillId] = levelNumber;
+  renderSkills();
+});
+
+// Bepaalt of de laatste `pass_sessions_min` sessies op dit niveau het slaagcriterium halen, en
+// zet zo ja `skill_progressions.current_level_number` een niveau omhoog. Gedeeld door het
+// één-tik-loggen (markComponentDone) en de uitgebreide sessie-vorm (logSkillSession).
+async function checkAndApplyLevelUp(userId, skill, levelNumber, today) {
+  const level = (skill?.levels || []).find(l => l.level_number === levelNumber);
+  if (!level || !level.pass_sessions_min) return null;
+  const { data: recent } = await sb.from('skill_sessions').select('quality_score')
+    .eq('user_id', userId).eq('skill_id', skill.id).eq('level_number', levelNumber)
+    .order('date', { ascending: false }).limit(level.pass_sessions_min);
+  if (!DecisionEngine.evaluateLevelUp({ recentSessions: recent || [], level })) return null;
+  const nextLevel = skill.levels.find(l => l.level_number === levelNumber + 1);
+  if (!nextLevel) return null;
+  await sb.from('skill_progressions').upsert({
+    user_id: userId, skill_id: skill.id, current_level_number: nextLevel.level_number, last_session_date: today
+  }, { onConflict: 'user_id,skill_id' });
+  progressionsCache[skill.id] = nextLevel.level_number;
+  return nextLevel;
+}
+
 async function markComponentDone(component, qualityScore) {
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
   const skill = skillsCache.find(s => s.name === component);
+  let leveledUp = null;
   if (skill) {
-    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today, quality_score: qualityScore });
-    const { data: existing } = await sb.from('skill_progressions').select('current_step').eq('user_id', user.id).eq('skill_id', skill.id).maybeSingle();
+    const curNum = progressionsCache[skill.id] ?? 0;
+    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today, quality_score: qualityScore, level_number: curNum });
     await sb.from('skill_progressions').upsert({
-      user_id: user.id, skill_id: skill.id, current_step: existing?.current_step || '', last_session_date: today
+      user_id: user.id, skill_id: skill.id, current_level_number: curNum, last_session_date: today
     }, { onConflict: 'user_id,skill_id' });
+    leveledUp = await checkAndApplyLevelUp(user.id, skill, curNum, today);
   }
   await bumpWeeklyTarget(user.id, component, qualityScore);
+  return leveledUp;
 }
 
 function localDateStr(d = new Date()) {
@@ -337,6 +389,8 @@ function weekStartStr(d = new Date()) {
 }
 
 let skillsCache = [];
+let progressionsCache = {}; // skill_id -> current_level_number
+let benchmarkDefsCache = [];
 
 // ---------- Auth ----------
 async function init() {
@@ -553,35 +607,95 @@ async function getActiveBlock(userId) {
 }
 const currentWeekNumber = DecisionEngine.currentWeekNumber;
 
+// display:none inline (i.p.v. de .hidden-class) omdat een class-toggle zou botsen met de
+// display:flex die dit element nodig heeft zodra het wél zichtbaar is (specificiteit-conflict).
+function bmInlineFormHtml() {
+  return `<div class="bmInlineForm" style="margin-top:8px;gap:6px;display:none">
+    <input type="number" step="0.1" class="bmInlineInput" placeholder="Nieuwe waarde" style="flex:3;padding:14px;font-size:17px" />
+    <button type="button" class="secondary bmSaveBtn" style="flex:1;margin:0;padding:10px 4px">Opslaan</button>
+  </div>`;
+}
+
 // ---------- Dashboard ----------
 async function renderDashboard() {
   const { data: { user } } = await sb.auth.getUser();
-  const { data: benchmarks } = await sb.from('benchmarks').select('*').eq('user_id', user.id).order('date', { ascending: false });
+  const { data: benchmarks } = await sb.from('benchmarks').select('*').eq('user_id', user.id)
+    .order('date', { ascending: false }).order('created_at', { ascending: false });
+  const latestFor = (name) => benchmarks?.find(b => b.name === name);
+
   const listEl = document.getElementById('readinessList');
   const rows = [];
   for (const s of skillsCache.filter(s => s.target_value != null)) {
-    const latest = benchmarks?.find(b => b.name === s.name);
+    const latest = latestFor(s.name);
     const value = latest ? Number(latest.value) : null;
     const pct = value ? Math.min(100, Math.round((value / s.target_value) * 100)) : 0;
-    rows.push({ name: s.name, pct, value, target: { target: s.target_value, unit: s.target_unit } });
+    rows.push({ name: s.name, pct, value, target: s.target_value, unit: s.target_unit });
   }
   rows.sort((a, b) => a.pct - b.pct);
   listEl.innerHTML = rows.map(r => `
-    <div style="margin:12px 0">
+    <div class="benchmarkRow" data-name="${r.name}" style="margin:12px 0;cursor:pointer">
       <div class="row" style="justify-content:space-between">
         <strong>${r.name}</strong>
-        <span class="badge ${r.pct >= 100 ? 'ok' : 'warn'}">${r.value ?? '-'} / ${r.target.target} ${r.target.unit}</span>
+        <span class="badge ${r.pct >= 100 ? 'ok' : 'warn'}">${r.value ?? '-'} / ${r.target} ${r.unit}</span>
       </div>
       <div class="bar"><div style="width:${r.pct}%"></div></div>
+      ${bmInlineFormHtml()}
     </div>`).join('');
   const limiter = rows[0];
   document.getElementById('limiter').innerHTML = limiter
     ? `<strong>${limiter.name}</strong> (${limiter.pct}% van RX-ready criterium).
        ${contentHtml(limiter.name)}
-       ${doneButtonHtml(limiter.name)}
-       <p style="margin-top:8px;font-size:13px">Voeg benchmarks toe via de Skills-tab om dit nauwkeuriger te maken.</p>`
+       ${doneButtonHtml(limiter.name)}`
     : 'Nog geen benchmarks gelogd.';
+
+  // Kracht staat los van de skills: geen "Wat doe ik?"-content/done-knop (dat bestaat alleen voor
+  // skills), en toont beide RX-doelen naast elkaar i.p.v. één voortgangs-percentage.
+  const strengthEl = document.getElementById('strengthList');
+  strengthEl.innerHTML = benchmarkDefsCache.map(b => {
+    const latest = latestFor(b.name);
+    const value = latest ? Number(latest.value) : null;
+    const pct = value && b.target_near_rx ? Math.min(100, Math.round((value / b.target_near_rx) * 100)) : 0;
+    const reachedNear = b.target_near_rx != null && value != null && value >= b.target_near_rx;
+    const reachedStrong = b.target_strong_rx != null && value != null && value >= b.target_strong_rx;
+    return `
+    <div class="benchmarkRow" data-name="${b.name}" style="margin:12px 0;cursor:pointer">
+      <div class="row" style="justify-content:space-between">
+        <strong>${b.name}</strong>
+        <span>${value ?? '-'} ${b.unit}</span>
+      </div>
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:6px">
+        <span class="badge ${reachedNear ? 'ok' : ''}">${reachedNear ? '✓ ' : ''}Near RX: ${b.target_near_rx} ${b.unit}</span>
+        <span class="badge ${reachedStrong ? 'ok' : ''}">${reachedStrong ? '✓ ' : ''}Sterk RX: ${b.target_strong_rx} ${b.unit}</span>
+      </div>
+      ${bmInlineFormHtml()}
+    </div>`;
+  }).join('');
 }
+
+// Tik op een RX-Readiness-rij (skill of lift) om er een inline invoer voor te openen/sluiten.
+// Klikken in het invoerveld zelf mag niet toggle'n (anders sluit het formulier zodra je typt).
+document.addEventListener('click', async (e) => {
+  const saveBtn = e.target.closest('.bmSaveBtn');
+  if (saveBtn) {
+    const row = saveBtn.closest('.benchmarkRow');
+    const name = row.dataset.name;
+    const input = row.querySelector('.bmInlineInput');
+    const value = Number(input.value);
+    if (input.value === '' || Number.isNaN(value)) { alert('Vul een waarde in.'); return; }
+    const { data: { user } } = await sb.auth.getUser();
+    const { error } = await sb.from('benchmarks').insert({ user_id: user.id, name, value: String(value), date: localDateStr() });
+    if (error) { alert(error.message); return; }
+    renderDashboard();
+    return;
+  }
+  if (e.target.closest('.bmInlineForm')) return;
+  const bmRow = e.target.closest('.benchmarkRow');
+  if (bmRow) {
+    const form = bmRow.querySelector('.bmInlineForm');
+    if (form) form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  }
+});
 
 // ---------- Log ----------
 async function renderLog() {
@@ -606,52 +720,85 @@ async function renderLog() {
 
 // ---------- Skills ----------
 async function loadSkills() {
+  const { data: { user } } = await sb.auth.getUser();
   const { data: skillsData } = await sb.from('skills').select('*').order('name');
-  const { data: exercisesData } = await sb.from('skill_exercises').select('*').order('sort_order');
+  const { data: exercisesData } = await sb.from('skill_exercises').select('*').order('level_number').order('sort_order');
   const { data: conflictsData } = await sb.from('skill_muscle_conflicts').select('*');
+  const { data: levelsData } = await sb.from('skill_levels').select('*').order('level_number');
+  const { data: benchmarkDefsData } = await sb.from('benchmark_definitions').select('*').order('sort_order');
+  benchmarkDefsCache = benchmarkDefsData || [];
+  const { data: progressions } = await sb.from('skill_progressions').select('*').eq('user_id', user.id);
+  progressionsCache = {};
+  (progressions || []).forEach(p => { progressionsCache[p.skill_id] = p.current_level_number ?? 0; });
   skillsCache = (skillsData || []).map(s => ({
     ...s,
-    exercises: (exercisesData || []).filter(e => e.skill_id === s.id).map(e => e.step_text),
+    levels: (levelsData || []).filter(l => l.skill_id === s.id).map(l => ({
+      ...l,
+      exercises: (exercisesData || []).filter(e => e.skill_id === s.id && e.level_number === l.level_number).map(e => e.step_text)
+    })),
     conflicts: (conflictsData || []).filter(c => c.skill_id === s.id).reduce((acc, c) => { acc[c.muscle_group] = c.severity; return acc; }, {})
   }));
   const sel = document.getElementById('sk_skill');
   sel.innerHTML = skillsCache.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  populateSkLevelOptions();
+}
+
+function populateSkLevelOptions() {
+  const skill = skillsCache.find(s => s.id === document.getElementById('sk_skill').value);
+  const levelSel = document.getElementById('sk_level');
+  const curNum = skill ? (progressionsCache[skill.id] ?? 0) : 0;
+  levelSel.innerHTML = (skill?.levels || [])
+    .map(l => `<option value="${l.level_number}" ${l.level_number === curNum ? 'selected' : ''}>Niveau ${l.level_number + 1}: ${l.name}</option>`)
+    .join('');
+}
+document.getElementById('sk_skill').addEventListener('change', populateSkLevelOptions);
+
+function levelOverrideHtml(skill) {
+  if ((skill.levels || []).length <= 1) return '';
+  const curNum = progressionsCache[skill.id] ?? 0;
+  const options = skill.levels
+    .map(l => `<option value="${l.level_number}" ${l.level_number === curNum ? 'selected' : ''}>Niveau ${l.level_number + 1}: ${l.name}</option>`)
+    .join('');
+  return `<div class="row" style="margin-top:10px;gap:6px">
+    <select class="levelOverrideSelect" data-skill-id="${skill.id}" style="flex:1">${options}</select>
+    <button type="button" class="secondary setLevelBtn" data-skill-id="${skill.id}" style="margin:0">Niveau instellen</button>
+  </div>`;
 }
 
 async function renderSkills() {
-  const { data: { user } } = await sb.auth.getUser();
-  const { data: progressions } = await sb.from('skill_progressions').select('*, skills(name)').eq('user_id', user.id);
   const container = document.getElementById('skillCards');
-  container.innerHTML = skillsCache.map(s => {
-    const p = progressions?.find(x => x.skill_id === s.id);
-    return `<div class="card"><h3>${s.name}</h3>
-      <p>Huidige stap: ${p?.current_step || '<em>nog niet gestart</em>'} · laatste sessie: ${p?.last_session_date || '-'}</p>
+  container.innerHTML = skillsCache.map(s => `<div class="card"><h3>${s.name}</h3>
       ${contentHtml(s.name)}
       ${doneButtonHtml(s.name)}
-    </div>`;
-  }).join('');
+      ${levelOverrideHtml(s)}
+    </div>`).join('');
 }
 
 document.getElementById('logSkillSession').addEventListener('click', async () => {
   const { data: { user } } = await sb.auth.getUser();
   const skillId = document.getElementById('sk_skill').value;
-  const step = val('sk_step');
+  const levelNumber = Number(document.getElementById('sk_level').value);
   const quality = numval('sk_quality');
   const success = numval('sk_success');
   const notes = val('sk_notes');
   const today = localDateStr();
 
   const { error: e1 } = await sb.from('skill_sessions').insert({
-    user_id: user.id, skill_id: skillId, date: today, step, quality_score: quality, success_pct: success, notes
+    user_id: user.id, skill_id: skillId, date: today, level_number: levelNumber, quality_score: quality, success_pct: success, notes
   });
   if (e1) { alert(e1.message); return; }
 
   await sb.from('skill_progressions').upsert({
-    user_id: user.id, skill_id: skillId, current_step: step, last_session_date: today, success_rate: success
+    user_id: user.id, skill_id: skillId, current_level_number: levelNumber, last_session_date: today, success_rate: success
   }, { onConflict: 'user_id,skill_id' });
+  progressionsCache[skillId] = levelNumber;
 
-  await bumpWeeklyTarget(user.id, skillsCache.find(s => s.id === skillId)?.name, quality);
-  alert('Skill sessie opgeslagen.');
+  const skill = skillsCache.find(s => s.id === skillId);
+  const nextLevel = await checkAndApplyLevelUp(user.id, skill, levelNumber, today);
+
+  await bumpWeeklyTarget(user.id, skill?.name, quality);
+  alert('Skill sessie opgeslagen.' + (nextLevel ? ` 🎉 Level omhoog: ${nextLevel.name}` : ''));
+  populateSkLevelOptions();
   renderSkills();
 });
 

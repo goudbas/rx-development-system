@@ -161,6 +161,17 @@
     };
   }
 
+  // Niveau-upgrade: minimaal `level.pass_sessions_min` OPEENVOLGENDE sessies (meest-recent-eerst
+  // in recentSessions) met quality_score >= level.pass_quality_min. Eén mindere sessie breekt de streak.
+  function evaluateLevelUp({ recentSessions, level }) {
+    if (!level || !level.pass_sessions_min) return false;
+    const need = level.pass_sessions_min;
+    const qualityMin = level.pass_quality_min ?? 4;
+    const streak = (recentSessions || []).slice(0, need);
+    if (streak.length < need) return false;
+    return streak.every(s => (s.quality_score ?? 0) >= qualityMin);
+  }
+
   function currentWeekNumber(block) {
     const start = new Date(block.start_date);
     const diffDays = Math.floor((new Date() - start) / 86400000);
@@ -170,7 +181,8 @@
   global.DecisionEngine = {
     MUSCLE_GROUPS,
     classifyReadiness,
-    computePreClassRecommendation, computePostClassRecommendation, currentWeekNumber
+    computePreClassRecommendation, computePostClassRecommendation, currentWeekNumber,
+    evaluateLevelUp
   };
 
 })(window);

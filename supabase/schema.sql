@@ -331,3 +331,157 @@ insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
   ) as v(muscle_group, severity)
   where s.name = 'Strength'
   on conflict (skill_id, muscle_group) do update set severity = excluded.severity;
+
+-- ============ Migratie: skill-niveaus (Deel 6/10 vervolg) — genummerde niveaus met eigen ============
+-- ============ oefeningen + slaagcriterium, i.p.v. één platte oefenlijst per skill. ============
+-- Zie localfiles/Skill_Level_Content.md voor de volledige inhoud en onderbouwing per skill.
+
+create table if not exists skill_levels (
+  id uuid primary key default gen_random_uuid(),
+  skill_id uuid not null references skills(id) on delete cascade,
+  level_number int not null,
+  name text not null,
+  pass_criteria_text text,
+  pass_quality_min int not null default 4,
+  pass_sessions_min int not null default 3,
+  unique (skill_id, level_number)
+);
+alter table skill_levels enable row level security;
+drop policy if exists "skill_levels_read" on skill_levels;
+create policy "skill_levels_read" on skill_levels for select using (auth.role() = 'authenticated');
+
+alter table skill_exercises add column if not exists level_number int not null default 0;
+alter table skill_progressions add column if not exists current_level_number int not null default 0;
+alter table skill_sessions add column if not exists level_number int;
+
+-- current_step is vervangen door current_level_number; de kolom blijft bestaan (geen dataverlies)
+-- maar mag niet langer NOT NULL zijn, anders faalt de upsert voor een skill die nog nooit gelogd is.
+alter table skill_progressions alter column current_step drop not null;
+
+-- Ring Muscle-Up
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  select s.id, v.level_number, v.name, v.pass_criteria_text, v.pass_quality_min, v.pass_sessions_min from skills s
+  cross join (values
+    (0, 'Fundament', 'False grip hang 3×20 sec pijnvrij vastgehouden', 4, 3),
+    (1, 'Transitiekracht', '4×5 transities met controle, geen zwaai-momentum', 4, 3),
+    (2, 'Assisted reps', '5×3 band-assisted reps met lichte weerstandsband', 4, 3),
+    (3, 'Eerste strict reps', '3 losse strict RMU''s binnen één sessie', 4, 2)
+  ) as v(level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  where s.name = 'Ring Muscle-Up'
+  on conflict (skill_id, level_number) do update set
+    name = excluded.name, pass_criteria_text = excluded.pass_criteria_text,
+    pass_quality_min = excluded.pass_quality_min, pass_sessions_min = excluded.pass_sessions_min;
+
+update skill_exercises set level_number = 0 where skill_id = (select id from skills where name = 'Ring Muscle-Up') and step_text = 'False grip hang — 3×20 sec';
+update skill_exercises set level_number = 0 where skill_id = (select id from skills where name = 'Ring Muscle-Up') and step_text = 'Ring support hold — 3×30 sec';
+update skill_exercises set level_number = 1 where skill_id = (select id from skills where name = 'Ring Muscle-Up') and step_text = 'Low ring transitions — 4×5';
+update skill_exercises set level_number = 2 where skill_id = (select id from skills where name = 'Ring Muscle-Up') and step_text = 'Band/feet assisted RMU — 5×2';
+insert into skill_exercises (skill_id, sort_order, step_text, level_number)
+  select s.id, 4, 'Strict RMU singles — losse pogingen', 3 from skills s
+  where s.name = 'Ring Muscle-Up'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text, level_number = excluded.level_number;
+
+-- Handstand Walk
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  select s.id, v.level_number, v.name, v.pass_criteria_text, v.pass_quality_min, v.pass_sessions_min from skills s
+  cross join (values
+    (0, 'Muur-posities', '3×3 wall walks met controle tot verticaal', 4, 3),
+    (1, 'Balans en stabiliteit', '3×20 shoulder taps zonder voeten van de muur', 4, 3),
+    (2, 'Freestanding', 'Groeiend aantal losse stappen richting het HSW-doel', 4, 3)
+  ) as v(level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  where s.name = 'Handstand Walk'
+  on conflict (skill_id, level_number) do update set
+    name = excluded.name, pass_criteria_text = excluded.pass_criteria_text,
+    pass_quality_min = excluded.pass_quality_min, pass_sessions_min = excluded.pass_sessions_min;
+
+update skill_exercises set level_number = 0 where skill_id = (select id from skills where name = 'Handstand Walk') and step_text = 'Wall walks — 3×3';
+update skill_exercises set level_number = 1 where skill_id = (select id from skills where name = 'Handstand Walk') and step_text = 'Shoulder taps — 3×20';
+update skill_exercises set level_number = 2 where skill_id = (select id from skills where name = 'Handstand Walk') and step_text = 'Freestanding balance / walk attempts — 10 min';
+
+-- Toes-to-Bar (niveau 0 en 1 zijn nieuw, bestaande rij wordt niveau 2; niveau 3 is nieuw)
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  select s.id, v.level_number, v.name, v.pass_criteria_text, v.pass_quality_min, v.pass_sessions_min from skills s
+  cross join (values
+    (0, 'Basis compressie', 'Hollow hold 3×30 sec + 3×10 knee raises met controle', 4, 3),
+    (1, 'Beat swing & compressie', '3×10 beat swings met ritme', 4, 3),
+    (2, 'Gecontroleerde singles', 'EMOM 10 met 5-7 nette TTB per minuut', 4, 3),
+    (3, 'Unbroken sets', '3×5 ongebroken TTB', 4, 2)
+  ) as v(level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  where s.name = 'Toes-to-Bar'
+  on conflict (skill_id, level_number) do update set
+    name = excluded.name, pass_criteria_text = excluded.pass_criteria_text,
+    pass_quality_min = excluded.pass_quality_min, pass_sessions_min = excluded.pass_sessions_min;
+
+update skill_exercises set level_number = 2 where skill_id = (select id from skills where name = 'Toes-to-Bar') and step_text = 'EMOM 10: 5-7 perfecte TTB';
+insert into skill_exercises (skill_id, sort_order, step_text, level_number)
+  select s.id, v.sort_order, v.step_text, v.level_number from skills s
+  cross join (values
+    (1, 'Hollow hold — 3×30 sec', 0),
+    (2, 'Hanging knee raise — 3×10', 0),
+    (3, 'Beat swing — 3×10', 1),
+    (4, 'Hanging compression — 3×10', 1),
+    (5, 'TTB unbroken sets — 3×5', 3)
+  ) as v(sort_order, step_text, level_number)
+  where s.name = 'Toes-to-Bar'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text, level_number = excluded.level_number;
+
+-- Double Unders
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  select s.id, v.level_number, v.name, v.pass_criteria_text, v.pass_quality_min, v.pass_sessions_min from skills s
+  cross join (values
+    (0, 'Singles-consistentie', '100 singles zonder misser', 4, 3),
+    (1, 'Korte DU-sets', 'Gemiddeld 7+/10 geslaagd over 10 rondes', 4, 3),
+    (2, 'Volume onder vermoeidheid', '20+ ongebroken direct na vermoeiende inspanning', 4, 3)
+  ) as v(level_number, name, pass_criteria_text, pass_quality_min, pass_sessions_min)
+  where s.name = 'Double Unders'
+  on conflict (skill_id, level_number) do update set
+    name = excluded.name, pass_criteria_text = excluded.pass_criteria_text,
+    pass_quality_min = excluded.pass_quality_min, pass_sessions_min = excluded.pass_sessions_min;
+
+update skill_exercises set level_number = 0 where skill_id = (select id from skills where name = 'Double Unders') and step_text = '100 perfecte singles';
+update skill_exercises set level_number = 1 where skill_id = (select id from skills where name = 'Double Unders') and step_text = '10 rondes: 10 DU pogingen';
+update skill_exercises set step_text = 'DU''s in sets van 20+ direct na cardio-inspanning', level_number = 2
+  where skill_id = (select id from skills where name = 'Double Unders') and step_text = 'Stop zodra de techniek verslechtert';
+
+-- Butterfly Pull-up, Strength, Mobility: één neutraal niveau (doorlopend, geen mastery-concept)
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text)
+  select s.id, 0, 'Onderhoud', null from skills s where s.name = 'Butterfly Pull-up'
+  on conflict (skill_id, level_number) do nothing;
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text)
+  select s.id, 0, 'Doorlopend krachtprogramma', null from skills s where s.name = 'Strength'
+  on conflict (skill_id, level_number) do nothing;
+insert into skill_levels (skill_id, level_number, name, pass_criteria_text)
+  select s.id, 0, 'Dagelijkse routine', null from skills s where s.name = 'Mobility'
+  on conflict (skill_id, level_number) do nothing;
+
+-- ============ Migratie: RX-krachtbenchmarks ============
+-- Reference data (net als skills): welke lifts we tracken en wat "near RX" / "sterk RX" betekent.
+-- Loggen zelf gebeurt in de bestaande, personal `benchmarks`-tabel (name = deze lift-naam, of een skill-naam).
+create table if not exists benchmark_definitions (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  unit text not null default 'kg',
+  target_near_rx numeric,
+  target_strong_rx numeric,
+  sort_order int not null default 0
+);
+alter table benchmark_definitions enable row level security;
+drop policy if exists "benchmark_definitions_read" on benchmark_definitions;
+create policy "benchmark_definitions_read" on benchmark_definitions for select using (auth.role() = 'authenticated');
+
+-- `date` alleen (geen tijd) kan op dezelfde dag meerdere keren gelogde waarden niet ordenen —
+-- created_at lost dat op zodat de nieuwste log altijd als "laatste waarde" telt.
+alter table benchmarks add column if not exists created_at timestamptz not null default now();
+
+insert into benchmark_definitions (name, sort_order, target_near_rx, target_strong_rx) values
+  ('Back Squat', 0, 140, 180),
+  ('Front Squat', 1, 120, 150),
+  ('Deadlift', 2, 180, 220),
+  ('Clean & Jerk', 3, 90, 120),
+  ('Snatch', 4, 70, 95),
+  ('Strict Press', 5, 60, 80),
+  ('Push Press', 6, 80, 100),
+  ('Push Jerk', 7, 90, 115),
+  ('Weighted Pull-up', 8, 20, 40)
+on conflict (name) do update set
+  sort_order = excluded.sort_order, target_near_rx = excluded.target_near_rx, target_strong_rx = excluded.target_strong_rx;
