@@ -158,6 +158,10 @@ begin
     'benchmarks','coach_recommendations'
   ])
   loop
+    execute format('drop policy if exists "owner_select" on %I', t);
+    execute format('drop policy if exists "owner_insert" on %I', t);
+    execute format('drop policy if exists "owner_update" on %I', t);
+    execute format('drop policy if exists "owner_delete" on %I', t);
     execute format('create policy "owner_select" on %I for select using (auth.uid() = user_id)', t);
     execute format('create policy "owner_insert" on %I for insert with check (auth.uid() = user_id)', t);
     execute format('create policy "owner_update" on %I for update using (auth.uid() = user_id)', t);
@@ -167,4 +171,163 @@ end $$;
 
 -- skills is reference data: readable by any logged-in user, not writable from the client
 alter table skills enable row level security;
+drop policy if exists "skills_read" on skills;
 create policy "skills_read" on skills for select using (auth.role() = 'authenticated');
+
+-- Migratie: welke spiergroepen vandaag (veel) spierpijn hebben, om extra oefeningen daarop af te stemmen.
+alter table daily_logs add column if not exists sore_muscle_groups text[] not null default '{}';
+
+-- ============ Migratie: skills wordt de algemene component-tabel (skill + strength + mobility), ============
+-- ============ zodat de exercise-library data-driven is i.p.v. hardcoded in decision-engine.js. ============
+alter table skills add column if not exists timing text not null default 'pre' check (timing in ('pre','post','any'));
+alter table skills add column if not exists target_value numeric;
+alter table skills add column if not exists target_unit text;
+alter table skills add column if not exists goal_text text;
+
+insert into skills (name, domain, timing, goal_text) values
+  ('Strength', 'strength', 'post', '+10-15 kg front squat, duidelijk sterkere pulling strength.'),
+  ('Mobility', 'mobility', 'any', 'Dagelijkse schouder-stability.')
+on conflict (name) do nothing;
+
+update skills set target_value = 3, target_unit = 'ongebroken reps',
+  goal_text = '3-5 ongebroken RMU. Let op: bevriest bij "ring support hold" tot schouder 2 weken pijnvrij is.'
+  where name = 'Ring Muscle-Up';
+update skills set target_value = 15, target_unit = 'meter',
+  goal_text = '15-20 meter ononderbroken.'
+  where name = 'Handstand Walk';
+update skills set target_value = 75, target_unit = 'ongebroken reps',
+  goal_text = '75-100 ongebroken.'
+  where name = 'Double Unders';
+update skills set target_value = 15, target_unit = 'ongebroken reps',
+  goal_text = '20+ ongebroken TTB.'
+  where name = 'Toes-to-Bar';
+update skills set target_value = 15, target_unit = 'ongebroken reps',
+  goal_text = 'Al beheerst — onderhoudsvolume.'
+  where name = 'Butterfly Pull-up';
+
+-- Losse oefenstappen per component (vervangt BLOCK_CONTENT[x].steps).
+create table if not exists skill_exercises (
+  id uuid primary key default gen_random_uuid(),
+  skill_id uuid not null references skills(id) on delete cascade,
+  sort_order int not null default 0,
+  step_text text not null,
+  unique (skill_id, sort_order)
+);
+alter table skill_exercises enable row level security;
+drop policy if exists "skill_exercises_read" on skill_exercises;
+create policy "skill_exercises_read" on skill_exercises for select using (auth.role() = 'authenticated');
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'False grip hang — 3×20 sec'),
+    (1, 'Low ring transitions — 4×5'),
+    (2, 'Band/feet assisted RMU — 5×2'),
+    (3, 'Ring support hold — 3×30 sec')
+  ) as v(sort_order, step_text)
+  where s.name = 'Ring Muscle-Up'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'Wall walks — 3×3'),
+    (1, 'Shoulder taps — 3×20'),
+    (2, 'Freestanding balance / walk attempts — 10 min')
+  ) as v(sort_order, step_text)
+  where s.name = 'Handstand Walk'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, '100 perfecte singles'),
+    (1, '10 rondes: 10 DU pogingen'),
+    (2, 'Stop zodra de techniek verslechtert')
+  ) as v(sort_order, step_text)
+  where s.name = 'Double Unders'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'EMOM 10: 5-7 perfecte TTB')
+  ) as v(sort_order, step_text)
+  where s.name = 'Toes-to-Bar'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'Butterfly drill — 4×8-12')
+  ) as v(sort_order, step_text)
+  where s.name = 'Butterfly Pull-up'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'Sessie A: Front Squat 5×5, Weighted Pull-up 5×5'),
+    (1, 'Sessie B: Strict Press 5×5, Romanian Deadlift 4×8')
+  ) as v(sort_order, step_text)
+  where s.name = 'Strength'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+insert into skill_exercises (skill_id, sort_order, step_text)
+  select s.id, v.sort_order, v.step_text from skills s
+  cross join (values
+    (0, 'Banded external rotation — 2×20'),
+    (1, 'Face pull — 2×20'),
+    (2, 'Scap push-up — 2×15'),
+    (3, 'Dead hang — 2×45 sec'),
+    (4, 'Thoracic extension — 2 min'),
+    (5, 'Lat stretch — 2 min')
+  ) as v(sort_order, step_text)
+  where s.name = 'Mobility'
+  on conflict (skill_id, sort_order) do update set step_text = excluded.step_text;
+
+-- Spiergroep-conflicten per component: 'block' = volledig uitsluiten, 'downgrade' = alleen kiezen
+-- als er geen niet-gedowngrade kandidaat is (vervangt het binaire MUSCLE_AVOID_MAP). Coaching judgement [C].
+create table if not exists skill_muscle_conflicts (
+  id uuid primary key default gen_random_uuid(),
+  skill_id uuid not null references skills(id) on delete cascade,
+  muscle_group text not null,
+  severity text not null check (severity in ('block', 'downgrade')),
+  unique (skill_id, muscle_group)
+);
+alter table skill_muscle_conflicts enable row level security;
+drop policy if exists "skill_muscle_conflicts_read" on skill_muscle_conflicts;
+create policy "skill_muscle_conflicts_read" on skill_muscle_conflicts for select using (auth.role() = 'authenticated');
+
+insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
+  select s.id, v.muscle_group, v.severity from skills s
+  cross join (values ('schouders', 'block'), ('armen', 'block')) as v(muscle_group, severity)
+  where s.name = 'Ring Muscle-Up'
+  on conflict (skill_id, muscle_group) do update set severity = excluded.severity;
+
+insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
+  select s.id, v.muscle_group, v.severity from skills s
+  cross join (values ('schouders', 'downgrade')) as v(muscle_group, severity)
+  where s.name = 'Handstand Walk'
+  on conflict (skill_id, muscle_group) do update set severity = excluded.severity;
+
+insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
+  select s.id, v.muscle_group, v.severity from skills s
+  cross join (values ('rug', 'downgrade'), ('armen', 'downgrade'), ('core', 'downgrade')) as v(muscle_group, severity)
+  where s.name = 'Toes-to-Bar'
+  on conflict (skill_id, muscle_group) do update set severity = excluded.severity;
+
+insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
+  select s.id, v.muscle_group, v.severity from skills s
+  cross join (values ('kuiten', 'block')) as v(muscle_group, severity)
+  where s.name = 'Double Unders'
+  on conflict (skill_id, muscle_group) do update set severity = excluded.severity;
+
+insert into skill_muscle_conflicts (skill_id, muscle_group, severity)
+  select s.id, v.muscle_group, v.severity from skills s
+  cross join (values
+    ('schouders', 'downgrade'), ('rug', 'downgrade'), ('borst', 'downgrade'),
+    ('armen', 'downgrade'), ('benen', 'downgrade')
+  ) as v(muscle_group, severity)
+  where s.name = 'Strength'
+  on conflict (skill_id, muscle_group) do update set severity = excluded.severity;

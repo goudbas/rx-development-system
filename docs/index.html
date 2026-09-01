@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0f172a" />
 <link rel="icon" href="icon.svg" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="decision-engine.js"></script>
 <style>
   :root{
     --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8;
@@ -77,14 +78,7 @@
     <h2>Today</h2>
 
     <div class="card">
-      <label>Hoe was de class? (overall)</label>
-      <div class="chip-group" data-field="overall_load">
-        <button type="button" class="chip" data-value="easy">easy</button>
-        <button type="button" class="chip" data-value="moderate">moderate</button>
-        <button type="button" class="chip" data-value="hard">hard</button>
-        <button type="button" class="chip" data-value="very_hard">very hard</button>
-      </div>
-
+      <h3>Voor de class</h3>
       <label>Hoe voel je je? (readiness)</label>
       <div class="chip-group scale" data-field="readiness">
         <button type="button" class="chip" data-value="1">1</button>
@@ -94,13 +88,63 @@
         <button type="button" class="chip" data-value="5">5</button>
       </div>
 
-      <label>Pijn/irritatie</label>
-      <div class="chip-group" data-field="pain_level">
-        <button type="button" class="chip active" data-value="none">geen</button>
-        <button type="button" class="chip" data-value="mild">mild</button>
-        <button type="button" class="chip" data-value="significant">significant</button>
+      <details>
+        <summary>Meer detail (optioneel)</summary>
+        <div class="detail-body">
+          <label>Pijn/irritatie</label>
+          <div class="chip-group" data-field="pain_level">
+            <button type="button" class="chip active" data-value="none">geen</button>
+            <button type="button" class="chip" data-value="mild">mild</button>
+            <button type="button" class="chip" data-value="significant">significant</button>
+          </div>
+          <input id="today_pain_location" type="text" placeholder="locatie, bv. schouder" class="hidden" style="margin-top:8px" />
+
+          <label>Welke spiergroepen hebben (veel) spierpijn?</label>
+          <div class="chip-group" data-field="sore_muscle_groups" data-multi="true" id="soreMuscleGroups"></div>
+
+          <label>Fatigue</label>
+          <div class="chip-group scale" data-field="fatigue">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+          <label>Soreness (algemeen)</label>
+          <div class="chip-group scale" data-field="soreness">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+          <label>Slaap</label>
+          <div class="chip-group scale" data-field="sleep">
+            <button type="button" class="chip" data-value="1">1</button>
+            <button type="button" class="chip" data-value="2">2</button>
+            <button type="button" class="chip" data-value="3">3</button>
+            <button type="button" class="chip" data-value="4">4</button>
+            <button type="button" class="chip" data-value="5">5</button>
+          </div>
+        </div>
+      </details>
+
+      <button id="logPreClassBtn">Log &amp; advies (voor de class)</button>
+    </div>
+
+    <div class="card">
+      <div id="recommendationPre" class="rec">Vul hierboven in voor je pre-class skill-advies.</div>
+    </div>
+
+    <div class="card">
+      <h3>Na de class</h3>
+      <label>Hoe was de class? (overall)</label>
+      <div class="chip-group" data-field="overall_load">
+        <button type="button" class="chip" data-value="easy">easy</button>
+        <button type="button" class="chip" data-value="moderate">moderate</button>
+        <button type="button" class="chip" data-value="hard">hard</button>
+        <button type="button" class="chip" data-value="very_hard">very hard</button>
       </div>
-      <input id="today_pain_location" type="text" placeholder="locatie, bv. schouder" class="hidden" style="margin-top:8px" />
 
       <details>
         <summary>Meer detail (optioneel)</summary>
@@ -146,38 +190,14 @@
             <button type="button" class="chip active" data-value="false">nee</button>
             <button type="button" class="chip" data-value="true">ja</button>
           </div>
-          <label>Fatigue</label>
-          <div class="chip-group scale" data-field="fatigue">
-            <button type="button" class="chip" data-value="1">1</button>
-            <button type="button" class="chip" data-value="2">2</button>
-            <button type="button" class="chip" data-value="3">3</button>
-            <button type="button" class="chip" data-value="4">4</button>
-            <button type="button" class="chip" data-value="5">5</button>
-          </div>
-          <label>Soreness</label>
-          <div class="chip-group scale" data-field="soreness">
-            <button type="button" class="chip" data-value="1">1</button>
-            <button type="button" class="chip" data-value="2">2</button>
-            <button type="button" class="chip" data-value="3">3</button>
-            <button type="button" class="chip" data-value="4">4</button>
-            <button type="button" class="chip" data-value="5">5</button>
-          </div>
-          <label>Slaap</label>
-          <div class="chip-group scale" data-field="sleep">
-            <button type="button" class="chip" data-value="1">1</button>
-            <button type="button" class="chip" data-value="2">2</button>
-            <button type="button" class="chip" data-value="3">3</button>
-            <button type="button" class="chip" data-value="4">4</button>
-            <button type="button" class="chip" data-value="5">5</button>
-          </div>
         </div>
       </details>
 
-      <button id="logTodayBtn">Log &amp; advies</button>
+      <button id="logPostClassBtn">Log class &amp; advies (na de class)</button>
     </div>
 
     <div class="card">
-      <div id="recommendation" class="rec">Vul hierboven in en druk op "Log &amp; advies".</div>
+      <div id="recommendationPost" class="rec">Log hierboven de class voor je post-class advies.</div>
     </div>
   </section>
 
@@ -247,96 +267,62 @@ const SUPABASE_URL = 'https://deujtrqudsmuzvthijrt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WzaOcwepcapln9AyyiE1Nw_LPoagKP3';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const SKILL_TARGETS = {
-  'Double Unders': { target: 75, unit: 'ongebroken reps' },
-  'Handstand Walk': { target: 15, unit: 'meter' },
-  'Ring Muscle-Up': { target: 3, unit: 'ongebroken reps' },
-  'Toes-to-Bar': { target: 15, unit: 'ongebroken reps' },
-  'Butterfly Pull-up': { target: 15, unit: 'ongebroken reps' }
-};
-
-// Concrete inhoud per component — wat je daadwerkelijk moet doen (uit Deel 7/Trainingblokken).
-const BLOCK_CONTENT = {
-  'Ring Muscle-Up': {
-    duration: '15 min, vóór de class',
-    steps: ['False grip hang — 3×20 sec', 'Low ring transitions — 4×5', 'Band/feet assisted RMU — 5×2', 'Ring support hold — 3×30 sec'],
-    goal: '3-5 ongebroken RMU. Let op: bevriest bij "ring support hold" tot schouder 2 weken pijnvrij is.'
-  },
-  'Handstand Walk': {
-    duration: '15 min, vóór de class',
-    steps: ['Wall walks — 3×3', 'Shoulder taps — 3×20', 'Freestanding balance / walk attempts — 10 min'],
-    goal: '15-20 meter ononderbroken.'
-  },
-  'Double Unders': {
-    duration: '10 min',
-    steps: ['100 perfecte singles', '10 rondes: 10 DU pogingen', 'Stop zodra de techniek verslechtert'],
-    goal: '75-100 ongebroken.'
-  },
-  'Toes-to-Bar': {
-    duration: '10-12 min',
-    steps: ['EMOM 10: 5-7 perfecte TTB'],
-    goal: '20+ ongebroken TTB.'
-  },
-  'Butterfly Pull-up': {
-    duration: '8-10 min (onderhoud)',
-    steps: ['Butterfly drill — 4×8-12'],
-    goal: 'Al beheerst — onderhoudsvolume.'
-  },
-  'Strength': {
-    duration: '20-30 min, ná de class',
-    steps: ['Sessie A: Front Squat 5×5, Weighted Pull-up 5×5', 'Sessie B: Strict Press 5×5, Romanian Deadlift 4×8'],
-    goal: '+10-15 kg front squat, duidelijk sterkere pulling strength.'
-  },
-  'Mobility': {
-    duration: '8-10 min',
-    steps: ['Banded external rotation — 2×20', 'Face pull — 2×20', 'Scap push-up — 2×15', 'Dead hang — 2×45 sec', 'Thoracic extension — 2 min', 'Lat stretch — 2 min'],
-    goal: 'Dagelijkse schouder-stability.'
-  }
-};
+const { MUSCLE_GROUPS } = DecisionEngine;
 
 function contentHtml(component) {
-  const c = BLOCK_CONTENT[component];
+  const c = skillsCache.find(s => s.name === component);
   if (!c) return '';
+  const timingLabel = c.timing === 'pre' ? 'vóór de class' : c.timing === 'post' ? 'ná de class' : null;
   return `<div style="margin-top:10px">
-    ${c.duration ? `<span class="tag">${c.duration}</span>` : ''}
-    <ul style="margin:10px 0 0 18px;padding:0">${c.steps.map(s => `<li>${s}</li>`).join('')}</ul>
-    ${c.goal ? `<p style="margin-top:8px"><strong>Doel:</strong> ${c.goal}</p>` : ''}
+    ${timingLabel ? `<span class="tag">${timingLabel}</span>` : ''}
+    <ul style="margin:10px 0 0 18px;padding:0">${(c.exercises || []).map(s => `<li>${s}</li>`).join('')}</ul>
+    ${c.goal_text ? `<p style="margin-top:8px"><strong>Doel:</strong> ${c.goal_text}</p>` : ''}
   </div>`;
 }
 function doneButtonHtml(component) {
-  const trackable = component && (skillsCache.some(s => s.name === component) || component === 'Strength');
+  const trackable = component && skillsCache.some(s => s.name === component);
   return trackable ? `<button class="markDoneBtn secondary" data-component="${component}" style="margin-top:14px">✓ Gedaan vandaag</button>` : '';
 }
 
-// ---------- Eén-tik afvinken (Skills, Block, Today advies) ----------
+// ---------- Eén-tik afvinken, met korte kwaliteits-feedback (Skills, Block, Today advies) ----------
 document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.markDoneBtn');
-  if (!btn) return;
-  btn.disabled = true;
-  const original = btn.textContent;
-  btn.textContent = 'Opslaan...';
-  await markComponentDone(btn.dataset.component);
-  btn.textContent = '✓ Gelogd';
-  if (btn.closest('#tab-block')) renderBlock();
-  if (btn.closest('#tab-skills')) renderSkills();
-  if (btn.closest('#tab-today')) renderRecommendation();
-  if (btn.closest('#tab-dashboard')) renderDashboard();
+  const doneBtn = e.target.closest('.markDoneBtn');
+  if (doneBtn) {
+    const component = doneBtn.dataset.component;
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;gap:6px;margin-top:14px';
+    wrap.innerHTML = [['2', 'Matig'], ['4', 'Oké'], ['5', 'Goed']]
+      .map(([q, label]) => `<button type="button" class="chip qualityChip" data-component="${component}" data-quality="${q}" style="margin:0">${label}</button>`)
+      .join('');
+    doneBtn.replaceWith(wrap);
+    return;
+  }
+
+  const qBtn = e.target.closest('.qualityChip');
+  if (!qBtn) return;
+  const wrap = qBtn.parentElement;
+  wrap.textContent = 'Opslaan...';
+  await markComponentDone(qBtn.dataset.component, Number(qBtn.dataset.quality));
+  wrap.textContent = '✓ Gelogd';
+  if (wrap.closest('#tab-block')) renderBlock();
+  if (wrap.closest('#tab-skills')) renderSkills();
+  if (wrap.closest('#recommendationPre')) renderPreClassRecommendation(false);
+  if (wrap.closest('#recommendationPost')) renderPostClassRecommendation(null, false);
+  if (wrap.closest('#tab-dashboard')) renderDashboard();
 });
 
-async function markComponentDone(component) {
+async function markComponentDone(component, qualityScore) {
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
   const skill = skillsCache.find(s => s.name === component);
   if (skill) {
-    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today });
+    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today, quality_score: qualityScore });
     const { data: existing } = await sb.from('skill_progressions').select('current_step').eq('user_id', user.id).eq('skill_id', skill.id).maybeSingle();
     await sb.from('skill_progressions').upsert({
       user_id: user.id, skill_id: skill.id, current_step: existing?.current_step || '', last_session_date: today
     }, { onConflict: 'user_id,skill_id' });
-  } else if (component === 'Strength') {
-    await sb.from('strength_sessions').insert({ user_id: user.id, date: today, exercise: 'Quick log' });
   }
-  await bumpWeeklyTarget(user.id, component);
+  await bumpWeeklyTarget(user.id, component, qualityScore);
 }
 
 function localDateStr(d = new Date()) {
@@ -405,18 +391,26 @@ function numval(id) { const v = document.getElementById(id).value; return v === 
 
 // ---------- Today: chip state ----------
 const todayState = {
-  overall_load: null, readiness: null, pain_level: 'none', pain_location: '',
+  overall_load: null, readiness: null, pain_level: 'none', pain_location: '', sore_muscle_groups: [],
   legs: null, pulling: null, pushing: null, overhead: null, gymnastics: null, conditioning: null,
   olympic_lifting: 'false', fatigue: null, soreness: null, sleep: null
 };
+
+document.getElementById('soreMuscleGroups').innerHTML = MUSCLE_GROUPS
+  .map(g => `<button type="button" class="chip" data-value="${g.id}">${g.label}</button>`).join('');
 
 document.querySelectorAll('#tab-today .chip-group').forEach(group => {
   group.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
+    const field = group.dataset.field;
+    if (group.dataset.multi === 'true') {
+      btn.classList.toggle('active');
+      todayState[field] = Array.from(group.querySelectorAll('.chip.active')).map(c => c.dataset.value);
+      return;
+    }
     group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
-    const field = group.dataset.field;
     todayState[field] = btn.dataset.value;
     if (field === 'pain_level') {
       document.getElementById('today_pain_location').classList.toggle('hidden', btn.dataset.value === 'none');
@@ -427,32 +421,14 @@ document.getElementById('today_pain_location').addEventListener('input', (e) => 
   todayState.pain_location = e.target.value;
 });
 
-// ---------- Today: log + advies in één actie ----------
-document.getElementById('logTodayBtn').addEventListener('click', logToday);
+// ---------- Today: voor de class (readiness loggen + skill-advies) ----------
+document.getElementById('logPreClassBtn').addEventListener('click', logPreClass);
 
-async function logToday() {
-  const out = document.getElementById('recommendation');
+async function logPreClass() {
+  const out = document.getElementById('recommendationPre');
   out.textContent = 'Opslaan...';
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
-
-  const detailFields = [todayState.legs, todayState.pulling, todayState.pushing, todayState.overhead, todayState.gymnastics, todayState.conditioning];
-  const hasClassData = todayState.overall_load || detailFields.some(Boolean);
-
-  if (hasClassData) {
-    const { data: session, error: sErr } = await sb.from('training_sessions')
-      .insert({ user_id: user.id, date: today, session_type: 'class' }).select().single();
-    if (sErr) { out.textContent = sErr.message; return; }
-    const clPayload = {
-      user_id: user.id, training_session_id: session.id,
-      legs: todayState.legs, pulling: todayState.pulling, pushing: todayState.pushing,
-      overhead: todayState.overhead, gymnastics: todayState.gymnastics,
-      olympic_lifting: todayState.olympic_lifting === 'true',
-      conditioning: todayState.conditioning, overall_load: todayState.overall_load
-    };
-    const { error: clErr } = await sb.from('class_loads').insert(clPayload);
-    if (clErr) { out.textContent = clErr.message; return; }
-  }
 
   const logPayload = {
     user_id: user.id, date: today,
@@ -460,91 +436,122 @@ async function logToday() {
     fatigue: todayState.fatigue ? Number(todayState.fatigue) : null,
     soreness: todayState.soreness ? Number(todayState.soreness) : null,
     sleep: todayState.sleep ? Number(todayState.sleep) : null,
-    pain_level: todayState.pain_level, pain_location: todayState.pain_location || null
+    pain_level: todayState.pain_level, pain_location: todayState.pain_location || null,
+    sore_muscle_groups: todayState.sore_muscle_groups
   };
   const { error: lErr } = await sb.from('daily_logs').upsert(logPayload, { onConflict: 'user_id,date' });
   if (lErr) { out.textContent = lErr.message; return; }
 
-  await renderRecommendation();
+  await renderPreClassRecommendation(true);
 }
 
-// ---------- Daily Decision Engine (v1 heuristic, Deel 6) ----------
-async function renderRecommendation() {
-  const out = document.getElementById('recommendation');
+async function renderPreClassRecommendation(logToCoach) {
+  const out = document.getElementById('recommendationPre');
   out.textContent = 'Berekenen...';
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
 
   const { data: logToday } = await sb.from('daily_logs').select('*').eq('user_id', user.id).eq('date', today).maybeSingle();
-  const { data: sessionsToday } = await sb.from('training_sessions').select('id, class_loads(*)').eq('user_id', user.id).eq('date', today);
-  const classLoadToday = sessionsToday?.find(s => s.class_loads?.length)?.class_loads?.[0] || sessionsToday?.[0]?.class_loads || null;
-  const cl = Array.isArray(classLoadToday) ? classLoadToday[0] : classLoadToday;
-
-  // Hard stop
-  if (logToday?.pain_level === 'significant') {
-    out.innerHTML = `<strong>Recovery</strong>
-      <p style="margin-top:4px">Significante pijn gemeld (${logToday.pain_location || 'onbekende locatie'}) — geen extra belastend werk vandaag.</p>`;
-    return;
-  }
-
   const block = await getActiveBlock(user.id);
   if (!block) {
     out.innerHTML = `Opgeslagen. Geen actief trainingsblok — ga naar <strong>Block</strong> om er een aan te maken, dan kan ik targets meewegen.`;
     return;
   }
-  const weekNum = currentWeekNumber(block);
-  const { data: targets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
+  const weekNum = DecisionEngine.currentWeekNumber(block);
+  const { data: weeklyTargets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
 
-  const shoulderLoadedToday = cl && (cl.overhead === 'high' || cl.pulling === 'high');
-  const mildPainShoulder = logToday?.pain_level === 'mild' && (logToday.pain_location || '').toLowerCase().includes('schouder');
+  const result = DecisionEngine.computePreClassRecommendation({ logToday, weeklyTargets, components: skillsCache });
+  renderRecommendationResult(out, result);
+  if (logToCoach) await logCoachRecommendation(user.id, result);
+}
 
-  if (mildPainShoulder && shoulderLoadedToday) {
-    out.innerHTML = `<strong>Mobility/Stability</strong>
-      <p style="margin-top:4px">Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability.</p>
-      ${contentHtml('Mobility')}`;
+// ---------- Today: na de class (class load loggen + strength/mobility-advies) ----------
+document.getElementById('logPostClassBtn').addEventListener('click', logPostClass);
+
+async function logPostClass() {
+  const out = document.getElementById('recommendationPost');
+  out.textContent = 'Opslaan...';
+  const { data: { user } } = await sb.auth.getUser();
+  const today = localDateStr();
+
+  const { data: session, error: sErr } = await sb.from('training_sessions')
+    .insert({ user_id: user.id, date: today, session_type: 'class' }).select().single();
+  if (sErr) { out.textContent = sErr.message; return; }
+  const clPayload = {
+    user_id: user.id, training_session_id: session.id,
+    legs: todayState.legs, pulling: todayState.pulling, pushing: todayState.pushing,
+    overhead: todayState.overhead, gymnastics: todayState.gymnastics,
+    olympic_lifting: todayState.olympic_lifting === 'true',
+    conditioning: todayState.conditioning, overall_load: todayState.overall_load
+  };
+  const { error: clErr } = await sb.from('class_loads').insert(clPayload);
+  if (clErr) { out.textContent = clErr.message; return; }
+
+  await renderPostClassRecommendation(clPayload, true);
+}
+
+async function renderPostClassRecommendation(classLoadToday, logToCoach) {
+  const out = document.getElementById('recommendationPost');
+  out.textContent = 'Berekenen...';
+  const { data: { user } } = await sb.auth.getUser();
+  const today = localDateStr();
+
+  if (!classLoadToday) {
+    const { data: sessionsToday } = await sb.from('training_sessions').select('id, class_loads(*)').eq('user_id', user.id).eq('date', today);
+    const found = sessionsToday?.find(s => s.class_loads?.length)?.class_loads?.[0] || null;
+    classLoadToday = found;
+  }
+  if (!classLoadToday) { out.textContent = 'Log hierboven de class voor je post-class advies.'; return; }
+
+  const { data: logToday } = await sb.from('daily_logs').select('*').eq('user_id', user.id).eq('date', today).maybeSingle();
+  const block = await getActiveBlock(user.id);
+  if (!block) {
+    out.innerHTML = `Opgeslagen. Geen actief trainingsblok — ga naar <strong>Block</strong> om er een aan te maken, dan kan ik targets meewegen.`;
     return;
   }
+  const weekNum = DecisionEngine.currentWeekNumber(block);
+  const { data: weeklyTargets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
 
-  const under = (targets || [])
-    .filter(t => t.actual_count < t.target_min)
-    .sort((a, b) => (a.actual_count / Math.max(a.target_min, 1)) - (b.actual_count / Math.max(b.target_min, 1)));
+  const result = DecisionEngine.computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components: skillsCache });
+  renderRecommendationResult(out, result);
+  if (logToCoach) await logCoachRecommendation(user.id, result);
+}
 
-  if (under.length === 0) {
-    out.innerHTML = `<strong>Recovery</strong><p style="margin-top:4px">Alle weekly targets van dit blok zijn deze week al gehaald.</p>`;
+// ---------- Gedeeld: aanbeveling tonen + wegschrijven naar coach_recommendations ----------
+function renderRecommendationResult(out, result) {
+  const tierBadge = result.tier
+    ? `<span class="badge ${result.tier === 'green' ? 'ok' : 'warn'}" style="text-transform:uppercase">${result.tier}</span><br>`
+    : '';
+  const notesHtml = (result.notes && result.notes.length)
+    ? `<details style="margin-top:10px"><summary>Overwogen, niet gekozen (${result.notes.length})</summary>
+        <div class="detail-body"><ul style="margin:6px 0 0 18px;padding:0">${result.notes.map(n => `<li style="color:var(--muted);font-size:13px">${n}</li>`).join('')}</ul></div>
+      </details>`
+    : '';
+  if (result.recovery || !result.component) {
+    out.innerHTML = `${tierBadge}<strong>Recovery</strong><p style="margin-top:4px">${result.reasoning}</p>${notesHtml}`;
     return;
   }
+  out.innerHTML = `${tierBadge}<strong>${result.component}</strong>
+    <p style="margin-top:4px">${result.reasoning}</p>
+    ${contentHtml(result.component)}
+    ${doneButtonHtml(result.component)}
+    ${notesHtml}`;
+}
 
-  let pick = under[0];
-  // avoid stacking region already loaded hard in class today
-  if (pick.component === 'Strength' && cl?.overall_load === 'very_hard') {
-    pick = under.find(t => t.component !== 'Strength') || pick;
-  }
-  const componentIsShoulderSensitive = ['Ring Muscle-Up'].includes(pick.component);
-  if (componentIsShoulderSensitive && (mildPainShoulder || shoulderLoadedToday)) {
-    pick = under.find(t => t.component !== pick.component) || null;
-    if (!pick) {
-      out.innerHTML = `<strong>Mobility/Stability</strong>
-        <p style="margin-top:4px">Belangrijkste open target vraagt schouderbelasting die vandaag niet verstandig is — kies bewust voor herstel/mobility.</p>
-        ${contentHtml('Mobility')}`;
-      return;
-    }
-  }
-
-  out.innerHTML = `<strong>${pick.component}</strong>
-    <p style="margin-top:4px">Meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}).${cl ? ` Class load vandaag: overhead ${cl.overhead || '-'}, pulling ${cl.pulling || '-'}, overall ${cl.overall_load || '-'}.` : ''}</p>
-    ${contentHtml(pick.component)}
-    ${doneButtonHtml(pick.component)}`;
+async function logCoachRecommendation(userId, result) {
+  const reasoning = [result.reasoning, ...(result.notes || [])].filter(Boolean).join(' | ');
+  await sb.from('coach_recommendations').insert({
+    user_id: userId,
+    recommendation: result.component || 'Recovery',
+    reasoning
+  });
 }
 
 async function getActiveBlock(userId) {
   const { data } = await sb.from('training_blocks').select('*').eq('user_id', userId).eq('status', 'active').order('start_date', { ascending: false }).limit(1).maybeSingle();
   return data;
 }
-function currentWeekNumber(block) {
-  const start = new Date(block.start_date);
-  const diffDays = Math.floor((new Date() - start) / 86400000);
-  return Math.max(1, Math.floor(diffDays / 7) + 1);
-}
+const currentWeekNumber = DecisionEngine.currentWeekNumber;
 
 // ---------- Dashboard ----------
 async function renderDashboard() {
@@ -552,12 +559,11 @@ async function renderDashboard() {
   const { data: benchmarks } = await sb.from('benchmarks').select('*').eq('user_id', user.id).order('date', { ascending: false });
   const listEl = document.getElementById('readinessList');
   const rows = [];
-  for (const name of Object.keys(SKILL_TARGETS)) {
-    const target = SKILL_TARGETS[name];
-    const latest = benchmarks?.find(b => b.name === name);
+  for (const s of skillsCache.filter(s => s.target_value != null)) {
+    const latest = benchmarks?.find(b => b.name === s.name);
     const value = latest ? Number(latest.value) : null;
-    const pct = value ? Math.min(100, Math.round((value / target.target) * 100)) : 0;
-    rows.push({ name, pct, value, target });
+    const pct = value ? Math.min(100, Math.round((value / s.target_value) * 100)) : 0;
+    rows.push({ name: s.name, pct, value, target: { target: s.target_value, unit: s.target_unit } });
   }
   rows.sort((a, b) => a.pct - b.pct);
   listEl.innerHTML = rows.map(r => `
@@ -600,8 +606,14 @@ async function renderLog() {
 
 // ---------- Skills ----------
 async function loadSkills() {
-  const { data } = await sb.from('skills').select('*').order('name');
-  skillsCache = data || [];
+  const { data: skillsData } = await sb.from('skills').select('*').order('name');
+  const { data: exercisesData } = await sb.from('skill_exercises').select('*').order('sort_order');
+  const { data: conflictsData } = await sb.from('skill_muscle_conflicts').select('*');
+  skillsCache = (skillsData || []).map(s => ({
+    ...s,
+    exercises: (exercisesData || []).filter(e => e.skill_id === s.id).map(e => e.step_text),
+    conflicts: (conflictsData || []).filter(c => c.skill_id === s.id).reduce((acc, c) => { acc[c.muscle_group] = c.severity; return acc; }, {})
+  }));
   const sel = document.getElementById('sk_skill');
   sel.innerHTML = skillsCache.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
@@ -638,13 +650,14 @@ document.getElementById('logSkillSession').addEventListener('click', async () =>
     user_id: user.id, skill_id: skillId, current_step: step, last_session_date: today, success_rate: success
   }, { onConflict: 'user_id,skill_id' });
 
-  await bumpWeeklyTarget(user.id, skillsCache.find(s => s.id === skillId)?.name);
+  await bumpWeeklyTarget(user.id, skillsCache.find(s => s.id === skillId)?.name, quality);
   alert('Skill sessie opgeslagen.');
   renderSkills();
 });
 
-async function bumpWeeklyTarget(userId, componentName) {
+async function bumpWeeklyTarget(userId, componentName, qualityScore) {
   if (!componentName) return;
+  if (qualityScore != null && qualityScore < 3) return; // kwaliteitsgated exposure
   const block = await getActiveBlock(userId);
   if (!block) return;
   const weekNum = currentWeekNumber(block);
@@ -693,7 +706,7 @@ async function renderBlock() {
         </div>
       </div>
       <div class="bar"><div style="width:${Math.min(100, Math.round(t.actual_count / Math.max(t.target_min,1) * 100))}%"></div></div>
-      ${BLOCK_CONTENT[t.component] ? `<details><summary>Wat doe ik?</summary><div class="detail-body">${contentHtml(t.component)}</div></details>` : ''}
+      ${skillsCache.some(s => s.name === t.component) ? `<details><summary>Wat doe ik?</summary><div class="detail-body">${contentHtml(t.component)}</div></details>` : ''}
     </div>`).join('') || '<p>Geen targets voor deze week.</p>'}
   </div>`;
 }

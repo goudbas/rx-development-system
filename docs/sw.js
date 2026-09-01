@@ -1,5 +1,5 @@
-const CACHE = 'rx-dev-v2';
-const SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
+const CACHE = 'rx-dev-v3';
+const SHELL = ['./', './index.html', './decision-engine.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

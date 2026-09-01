@@ -1,0 +1,176 @@
+// RX Development System — Daily Decision Engine (Deel 6/10 uit het ontwerpdocument).
+// Pure logica: geen DOM, geen Supabase. Componenten (skills/strength/mobility incl. hun oefeningen
+// en spiergroep-conflicten) komen als data binnen vanuit Supabase (zie index.html loadSkills()) —
+// deze module bevat alleen de beslisregels, geen hardcoded content meer.
+
+(function (global) {
+
+  // Spiergroepen die je kunt selecteren als (veel) spierpijn. Vaste UI-enum, geen groeiende
+  // contentbibliotheek — blijft daarom hardcoded (in tegenstelling tot de componenten zelf).
+  const MUSCLE_GROUPS = [
+    { id: 'schouders', label: 'Schouders' },
+    { id: 'rug', label: 'Rug' },
+    { id: 'borst', label: 'Borst' },
+    { id: 'armen', label: 'Armen/grip' },
+    { id: 'benen', label: 'Benen' },
+    { id: 'kuiten', label: 'Kuiten' },
+    { id: 'core', label: 'Core' }
+  ];
+
+  function timingOf(component, componentsByName) {
+    return componentsByName[component]?.timing || 'any';
+  }
+
+  // Readiness-classificatie (Deel 6, coaching judgement [C]): één slechte waarde triggert nooit
+  // alleen RED, behalve significante pijn — dat blijft een harde stop.
+  function classifyReadiness(logToday) {
+    if (logToday?.pain_level === 'significant') return 'red';
+    const readiness = logToday?.readiness;
+    const fatigue = logToday?.fatigue;
+    if (readiness != null && readiness <= 2 && fatigue != null && fatigue >= 4) return 'red';
+    if (
+      logToday?.pain_level === 'mild' ||
+      readiness === 3 ||
+      (fatigue != null && fatigue >= 4) ||
+      (logToday?.soreness != null && logToday.soreness >= 4) ||
+      (logToday?.sleep != null && logToday.sleep <= 2)
+    ) return 'amber';
+    return 'green';
+  }
+
+  function painReasoning(logToday) {
+    if (logToday?.pain_level !== 'significant') return null;
+    return `Significante pijn gemeld${logToday.pain_location ? ` (${logToday.pain_location})` : ''} — geen extra belastend werk vandaag.`;
+  }
+
+  // Deelt de kandidaten in drie groepen o.b.v. gemelde spiergroep-spierpijn: genegeerd (block),
+  // gedowngraded (blijft kandidaat, maar alleen gekozen als er geen normale optie is), normaal.
+  function classifyConflicts(candidates, soreMuscleGroups, componentsByName) {
+    const normal = [], downgraded = [], notes = [];
+    (candidates || []).forEach(t => {
+      const conflicts = componentsByName[t.component]?.conflicts || {};
+      let severity = null;
+      (soreMuscleGroups || []).forEach(g => {
+        if (conflicts[g] && (!severity || (severity === 'downgrade' && conflicts[g] === 'block'))) severity = conflicts[g];
+      });
+      if (severity === 'block') {
+        notes.push(`${t.component} geblokkeerd: ${soreMuscleGroups.filter(g => conflicts[g] === 'block').join(', ')} sore.`);
+      } else if (severity === 'downgrade') {
+        downgraded.push(t);
+        notes.push(`${t.component} gedowngraded: ${soreMuscleGroups.filter(g => conflicts[g] === 'downgrade').join(', ')} sore — alleen bij gebrek aan alternatief.`);
+      } else {
+        normal.push(t);
+      }
+    });
+    return { normal, downgraded, notes };
+  }
+
+  function pickUnderTarget(candidates) {
+    const under = candidates
+      .filter(t => t.actual_count < t.target_min)
+      .sort((a, b) => (a.actual_count / Math.max(a.target_min, 1)) - (b.actual_count / Math.max(b.target_min, 1)));
+    return under[0] || null;
+  }
+
+  function selectCandidate(weeklyTargets, componentsByName, soreMuscleGroups, timingExclude, excludeNames) {
+    let candidates = (weeklyTargets || [])
+      .filter(t => timingOf(t.component, componentsByName) !== timingExclude)
+      .filter(t => !(excludeNames || []).includes(t.component));
+
+    const { normal, downgraded, notes } = classifyConflicts(candidates, soreMuscleGroups, componentsByName);
+
+    let pick = pickUnderTarget(normal);
+    let downgradedNote = null;
+    if (!pick) {
+      pick = pickUnderTarget(downgraded);
+      if (pick) downgradedNote = `Let op: ${pick.component} is gedowngraded vanwege gemelde spierpijn — hou volume/intensiteit bewust laag.`;
+    }
+    return { pick, notes, downgradedNote };
+  }
+
+  function componentsToMap(components) {
+    const map = {};
+    (components || []).forEach(c => { map[c.name] = c; });
+    return map;
+  }
+
+  // ---------- Voor de class: skill/mobility-advies o.b.v. weekly targets + spierpijn, NIET o.b.v. vandaag se class (die is nog onbekend). ----------
+  function computePreClassRecommendation({ logToday, weeklyTargets, components }) {
+    const tier = classifyReadiness(logToday);
+    const componentsByName = componentsToMap(components);
+
+    if (tier === 'red') {
+      return { tier, recovery: true, reasoning: painReasoning(logToday) || 'Readiness te laag — vandaag geen belastend werk vóór de class.', notes: [] };
+    }
+
+    const excludeNames = tier === 'amber' ? ['Strength'] : [];
+    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'post', excludeNames);
+    if (tier === 'amber') notes.push('Strength uitgesloten: readiness AMBER.');
+
+    if (!pick) {
+      return { tier, recovery: true, reasoning: 'Geen openstaande skill/mobility-targets deze week (of alles geblokkeerd door spierpijn).', notes };
+    }
+    return {
+      tier, component: pick.component,
+      reasoning: [
+        `Meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}), vóór de class.`,
+        downgradedNote
+      ].filter(Boolean).join(' '),
+      notes
+    };
+  }
+
+  // ---------- Na de class: strength/mobility-advies, houdt nu wél rekening met de zojuist gelogde class load. ----------
+  function computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components }) {
+    let tier = classifyReadiness(logToday);
+    const componentsByName = componentsToMap(components);
+
+    if (tier === 'red') {
+      return { tier, recovery: true, reasoning: painReasoning(logToday) || 'Readiness te laag — vandaag geen belastend werk na de class.', notes: [] };
+    }
+
+    const cl = classLoadToday;
+    if (cl?.overall_load === 'very_hard' && tier === 'green') tier = 'amber';
+
+    const shoulderLoadedToday = cl && (cl.overhead === 'high' || cl.pulling === 'high');
+    const mildPainShoulder = logToday?.pain_level === 'mild' && (logToday.pain_location || '').toLowerCase().includes('schouder');
+    if (mildPainShoulder && shoulderLoadedToday) {
+      return {
+        tier, component: 'Mobility',
+        reasoning: 'Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability.',
+        notes: []
+      };
+    }
+
+    const excludeNames = tier === 'amber' ? ['Strength'] : [];
+    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'pre', excludeNames);
+    if (tier === 'amber' && excludeNames.includes('Strength')) {
+      notes.push(cl?.overall_load === 'very_hard' ? 'Strength uitgesloten: zware class vandaag.' : 'Strength uitgesloten: readiness AMBER.');
+    }
+
+    if (!pick) {
+      return { tier, recovery: true, reasoning: 'Geen openstaande post-class targets vandaag — rust of onderhoud volstaat.', notes };
+    }
+    return {
+      tier, component: pick.component,
+      reasoning: [
+        `Meest onderbelicht deze week (${pick.actual_count}/${pick.target_min}-${pick.target_max}).${cl ? ` Class load vandaag: overhead ${cl.overhead || '-'}, pulling ${cl.pulling || '-'}, overall ${cl.overall_load || '-'}.` : ''}`,
+        downgradedNote
+      ].filter(Boolean).join(' '),
+      notes
+    };
+  }
+
+  function currentWeekNumber(block) {
+    const start = new Date(block.start_date);
+    const diffDays = Math.floor((new Date() - start) / 86400000);
+    return Math.max(1, Math.floor(diffDays / 7) + 1);
+  }
+
+  global.DecisionEngine = {
+    MUSCLE_GROUPS,
+    classifyReadiness,
+    computePreClassRecommendation, computePostClassRecommendation, currentWeekNumber
+  };
+
+})(window);
