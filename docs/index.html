@@ -190,16 +190,24 @@
     <div id="skillCards">Laden...</div>
     <div class="card">
       <details>
-        <summary>Uitgebreide sessie loggen (stap, kwaliteit, notities)</summary>
+        <summary>Uitgebreide sessie loggen (niveau, training A/B/C, kwaliteit, pijnscore)</summary>
         <div class="detail-body">
           <label>Skill</label>
           <select id="sk_skill"></select>
           <label>Niveau</label>
           <select id="sk_level"></select>
+          <label>Training</label>
+          <select id="sk_variant">
+            <option value="a">Training A</option>
+            <option value="b">Training B</option>
+            <option value="c">Training C</option>
+          </select>
           <div class="row">
             <div><label>Kwaliteit (1-5)</label><input id="sk_quality" type="number" min="1" max="5" /></div>
             <div><label>Succes %</label><input id="sk_success" type="number" min="0" max="100" /></div>
           </div>
+          <label>Pijnscore (0-10)</label>
+          <input id="sk_pain" type="number" min="0" max="10" />
           <label>Notities</label>
           <input id="sk_notes" type="text" />
           <button id="logSkillSession">Skill sessie opslaan</button>
@@ -231,21 +239,40 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const { MUSCLE_GROUPS } = DecisionEngine;
 
+function trainingListHtml(label, exercises) {
+  if (!exercises || !exercises.length) return '';
+  return `<div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px">
+    <span class="tag">${label}</span>
+    <ul style="margin:6px 0 0 18px;padding:0">${exercises.map(s => `<li>${s}</li>`).join('')}</ul>
+  </div>`;
+}
+
 function contentHtml(component) {
   const c = skillsCache.find(s => s.name === component);
   if (!c) return '';
   const timingLabel = c.timing === 'pre' ? 'vóór de class' : c.timing === 'post' ? 'ná de class' : null;
   const levels = c.levels || [];
+  const frozen = frozenCache[c.id];
   const curNum = progressionsCache[c.id] ?? 0;
-  const cur = levels.find(l => l.level_number === curNum) || levels[0];
+  // Bevroren: toon niveau 0 (fundament) i.p.v. het huidige niveau — voortgang blijft ongewijzigd in de database.
+  const displayNum = frozen?.frozen ? 0 : curNum;
+  const cur = levels.find(l => l.level_number === displayNum) || levels[0];
   const allLevelsHtml = levels.map(l => `<li>${l.level_number === curNum ? '<strong>→ ' : (l.level_number < curNum ? '✓ ' : '')}Niveau ${l.level_number + 1}: ${l.name}${l.level_number === curNum ? '</strong>' : ''}</li>`).join('');
   return `<div style="margin-top:10px">
     ${timingLabel ? `<span class="tag">${timingLabel}</span>` : ''}
+    ${frozen?.frozen ? `<div class="rec" style="margin-top:8px;border-color:var(--danger)">
+      <strong>🚫 Bevroren:</strong> ${frozen.reason}
+      <button type="button" class="secondary unfreezeBtn" data-skill-id="${c.id}" style="margin-top:8px">Ontdooien</button>
+    </div>` : ''}
     ${cur ? `<p style="margin-top:8px"><strong>Niveau ${cur.level_number + 1}/${levels.length} — ${cur.name}</strong></p>
-    <ul style="margin:6px 0 0 18px;padding:0">${(cur.exercises || []).map(s => `<li>${s}</li>`).join('')}</ul>
+    ${trainingListHtml('Training A', cur.exercisesA)}
+    ${trainingListHtml('Training B', cur.exercisesB)}
+    ${trainingListHtml('Training C', cur.exercisesC)}
     ${cur.pass_criteria_text ? `<p style="margin-top:6px;font-size:13px"><strong>Slaagcriterium:</strong> ${cur.pass_criteria_text}</p>` : ''}` : ''}
     ${levels.length > 1 ? `<details style="margin-top:8px"><summary>Alle niveaus</summary><ul style="margin:6px 0 0 18px;padding:0">${allLevelsHtml}</ul></details>` : ''}
+    ${c.common_mistakes_text ? `<details style="margin-top:8px"><summary>Veelgemaakte fouten</summary><p style="margin-top:6px;font-size:13px">${c.common_mistakes_text}</p></details>` : ''}
     ${c.goal_text ? `<p style="margin-top:8px"><strong>Doel:</strong> ${c.goal_text}</p>` : ''}
+    ${!frozen?.frozen ? `<button type="button" class="secondary freezeBtn" data-skill-id="${c.id}" style="margin-top:8px;font-size:12px">Bevriezen (blessure/terugval)</button>` : ''}
   </div>`;
 }
 function doneButtonHtml(component) {
@@ -271,11 +298,12 @@ document.addEventListener('click', async (e) => {
   if (!qBtn) return;
   const wrap = qBtn.parentElement;
   wrap.textContent = 'Opslaan...';
-  const nextLevel = await markComponentDone(qBtn.dataset.component, Number(qBtn.dataset.quality));
+  const result = await markComponentDone(qBtn.dataset.component, Number(qBtn.dataset.quality));
   wrap.textContent = '✓ Gelogd';
   // De tab-refreshes hieronder vervangen dit element meteen weer, dus een boodschap in wrap.textContent
-  // wordt nooit gezien — een level-up moet daarom via alert() (blokkerend, overleeft de re-render).
-  if (nextLevel) alert(`🎉 Level omhoog: ${nextLevel.name}`);
+  // wordt nooit gezien — een level-up/freeze-melding moet daarom via alert() (overleeft de re-render).
+  if (result?.nextLevel) alert(`🎉 Level omhoog: ${result.nextLevel.name}`);
+  if (result?.justFrozen) alert(`🚫 ${qBtn.dataset.component} tijdelijk bevroren: ${result.freezeReason}`);
   if (wrap.closest('#tab-block')) renderBlock();
   if (wrap.closest('#tab-skills')) renderSkills();
   if (wrap.closest('#recommendationPre')) renderPreClassRecommendation(false);
@@ -285,52 +313,95 @@ document.addEventListener('click', async (e) => {
 
 document.addEventListener('click', async (e) => {
   const setBtn = e.target.closest('.setLevelBtn');
-  if (!setBtn) return;
-  const skillId = setBtn.dataset.skillId;
-  const select = document.querySelector(`.levelOverrideSelect[data-skill-id="${skillId}"]`);
-  const levelNumber = Number(select.value);
+  if (setBtn) {
+    const skillId = setBtn.dataset.skillId;
+    const select = document.querySelector(`.levelOverrideSelect[data-skill-id="${skillId}"]`);
+    const levelNumber = Number(select.value);
+    const { data: { user } } = await sb.auth.getUser();
+    await sb.from('skill_progressions').upsert({
+      user_id: user.id, skill_id: skillId, current_level_number: levelNumber
+    }, { onConflict: 'user_id,skill_id' });
+    progressionsCache[skillId] = levelNumber;
+    renderSkills();
+    return;
+  }
+
+  const freezeBtn = e.target.closest('.freezeBtn');
+  const unfreezeBtn = e.target.closest('.unfreezeBtn');
+  if (!freezeBtn && !unfreezeBtn) return;
+  const skillId = (freezeBtn || unfreezeBtn).dataset.skillId;
   const { data: { user } } = await sb.auth.getUser();
-  await sb.from('skill_progressions').upsert({
-    user_id: user.id, skill_id: skillId, current_level_number: levelNumber
-  }, { onConflict: 'user_id,skill_id' });
-  progressionsCache[skillId] = levelNumber;
+  if (freezeBtn) {
+    const reason = prompt('Reden voor bevriezen (bv. blessure, coach-flag)?', 'Handmatig gemarkeerd') || 'Handmatig gemarkeerd';
+    await sb.from('skill_progressions').upsert({
+      user_id: user.id, skill_id: skillId, frozen: true, frozen_reason: reason, frozen_at: localDateStr()
+    }, { onConflict: 'user_id,skill_id' });
+    frozenCache[skillId] = { frozen: true, reason };
+  } else {
+    await sb.from('skill_progressions').upsert({
+      user_id: user.id, skill_id: skillId, frozen: false, frozen_reason: null, frozen_at: null
+    }, { onConflict: 'user_id,skill_id' });
+    frozenCache[skillId] = { frozen: false, reason: null };
+  }
   renderSkills();
+  if (document.getElementById('tab-block') && !document.getElementById('tab-block').classList.contains('hidden')) renderBlock();
+  if (document.getElementById('tab-dashboard') && !document.getElementById('tab-dashboard').classList.contains('hidden')) renderDashboard();
 });
 
-// Bepaalt of de laatste `pass_sessions_min` sessies op dit niveau het slaagcriterium halen, en
-// zet zo ja `skill_progressions.current_level_number` een niveau omhoog. Gedeeld door het
-// één-tik-loggen (markComponentDone) en de uitgebreide sessie-vorm (logSkillSession).
-async function checkAndApplyLevelUp(userId, skill, levelNumber, today) {
+// Draait na elke gelogde sessie (één-tik-loggen én de uitgebreide sessie-vorm): checkt eerst safety
+// freeze (pijnscore/terugval), en alleen als de skill niet (al) bevroren is, de niveau-upgrade.
+async function evaluateSkillAfterSession(userId, skill, levelNumber, today, sessions) {
   const level = (skill?.levels || []).find(l => l.level_number === levelNumber);
-  if (!level || !level.pass_sessions_min) return null;
-  const { data: recent } = await sb.from('skill_sessions').select('quality_score')
-    .eq('user_id', userId).eq('skill_id', skill.id).eq('level_number', levelNumber)
-    .order('date', { ascending: false }).limit(level.pass_sessions_min);
-  if (!DecisionEngine.evaluateLevelUp({ recentSessions: recent || [], level })) return null;
+  if (!level) return {};
+  if (!sessions) {
+    const { data: recent } = await sb.from('skill_sessions').select('quality_score, variant, pain_score')
+      .eq('user_id', userId).eq('skill_id', skill.id).eq('level_number', levelNumber)
+      .order('date', { ascending: false }).limit(50);
+    sessions = recent || [];
+  }
+
+  const wasFrozen = !!frozenCache[skill.id]?.frozen;
+  const freezeResult = DecisionEngine.evaluateSafetyFreeze({ recentSessions: sessions, level });
+  if (freezeResult.frozen && !wasFrozen) {
+    await sb.from('skill_progressions').upsert({
+      user_id: userId, skill_id: skill.id, frozen: true, frozen_reason: freezeResult.reason, frozen_at: today
+    }, { onConflict: 'user_id,skill_id' });
+    frozenCache[skill.id] = { frozen: true, reason: freezeResult.reason };
+    return { justFrozen: true, freezeReason: freezeResult.reason };
+  }
+  if (wasFrozen) return {}; // blijft bevroren tot handmatig ontdooid
+
+  if (!level.pass_sessions_min) return {};
+  if (!DecisionEngine.evaluateLevelUp({ recentSessions: sessions, level })) return {};
   const nextLevel = skill.levels.find(l => l.level_number === levelNumber + 1);
-  if (!nextLevel) return null;
+  if (!nextLevel) return {};
   await sb.from('skill_progressions').upsert({
     user_id: userId, skill_id: skill.id, current_level_number: nextLevel.level_number, last_session_date: today
   }, { onConflict: 'user_id,skill_id' });
   progressionsCache[skill.id] = nextLevel.level_number;
-  return nextLevel;
+  return { nextLevel };
 }
 
 async function markComponentDone(component, qualityScore) {
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
   const skill = skillsCache.find(s => s.name === component);
-  let leveledUp = null;
+  let result = {};
   if (skill) {
     const curNum = progressionsCache[skill.id] ?? 0;
-    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today, quality_score: qualityScore, level_number: curNum });
+    const { data: recentBefore } = await sb.from('skill_sessions').select('quality_score, variant, pain_score')
+      .eq('user_id', user.id).eq('skill_id', skill.id).eq('level_number', curNum)
+      .order('date', { ascending: false }).limit(50);
+    const variant = DecisionEngine.pickVariant(recentBefore || []);
+    await sb.from('skill_sessions').insert({ user_id: user.id, skill_id: skill.id, date: today, quality_score: qualityScore, level_number: curNum, variant });
     await sb.from('skill_progressions').upsert({
       user_id: user.id, skill_id: skill.id, current_level_number: curNum, last_session_date: today
     }, { onConflict: 'user_id,skill_id' });
-    leveledUp = await checkAndApplyLevelUp(user.id, skill, curNum, today);
+    const sessionsAfter = [{ quality_score: qualityScore, variant, pain_score: null }, ...(recentBefore || [])];
+    result = await evaluateSkillAfterSession(user.id, skill, curNum, today, sessionsAfter);
   }
   await bumpWeeklyTarget(user.id, component, qualityScore);
-  return leveledUp;
+  return result;
 }
 
 function localDateStr(d = new Date()) {
@@ -346,6 +417,10 @@ function weekStartStr(d = new Date()) {
 
 let skillsCache = [];
 let progressionsCache = {}; // skill_id -> current_level_number
+let frozenCache = {}; // skill_id -> { frozen, reason }
+function frozenSkillNames() {
+  return skillsCache.filter(s => frozenCache[s.id]?.frozen).map(s => s.name);
+}
 let benchmarkDefsCache = [];
 
 // ---------- Auth ----------
@@ -474,7 +549,7 @@ async function renderPreClassRecommendation(logToCoach) {
   const weekNum = DecisionEngine.currentWeekNumber(block);
   const { data: weeklyTargets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
 
-  const result = DecisionEngine.computePreClassRecommendation({ logToday, weeklyTargets, components: skillsCache });
+  const result = DecisionEngine.computePreClassRecommendation({ logToday, weeklyTargets, components: skillsCache, frozenNames: frozenSkillNames() });
   renderRecommendationResult(out, result);
   if (logToCoach) await logCoachRecommendation(user.id, result);
 }
@@ -533,7 +608,7 @@ async function renderPostClassRecommendation(classLoadToday, logToCoach) {
   const weekNum = DecisionEngine.currentWeekNumber(block);
   const { data: weeklyTargets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
 
-  const result = DecisionEngine.computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components: skillsCache });
+  const result = DecisionEngine.computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components: skillsCache, frozenNames: frozenSkillNames() });
   renderRecommendationResult(out, result);
   if (logToCoach) await logCoachRecommendation(user.id, result);
 }
@@ -623,18 +698,32 @@ async function renderDashboard() {
     const value = latest ? Number(latest.value) : null;
     const pct = value && b.target_near_rx ? Math.min(100, Math.round((value / b.target_near_rx) * 100)) : 0;
     const reachedNear = b.target_near_rx != null && value != null && value >= b.target_near_rx;
+    const reachedTussenstap = b.target_tussenstap != null && value != null && value >= b.target_tussenstap;
     const reachedStrong = b.target_strong_rx != null && value != null && value >= b.target_strong_rx;
+    // Niveau 0-4 uit de coach-tiers (0=nog niet gelogd, 1=70%, 2=Intermediate, 3=Tussenstap, 4=RX);
+    // niveau 5 is een handmatige bevestiging "onder vermoeidheid" (via notes-marker, geen aparte tabel).
+    let level = 0;
+    if (value != null && b.target_near_rx != null) {
+      if (value >= b.target_near_rx * 0.7) level = 1;
+      if (reachedNear) level = 2;
+      if (reachedTussenstap) level = 3;
+      if (reachedStrong) level = 4;
+    }
+    const fatigueConfirmed = (benchmarks || []).some(x => x.name === b.name && x.notes === 'fatigue-confirmed');
+    if (fatigueConfirmed && level === 4) level = 5;
     return `
     <div class="benchmarkRow" data-name="${b.name}" style="margin:12px 0;cursor:pointer">
       <div class="row" style="justify-content:space-between">
         <strong>${b.name}</strong>
-        <span>${value ?? '-'} ${b.unit}</span>
+        <span>${value ?? '-'} ${b.unit} · <span class="badge">Niveau ${level}/5</span></span>
       </div>
       <div class="bar"><div style="width:${pct}%"></div></div>
       <div class="row" style="justify-content:space-between;margin-top:6px">
-        <span class="badge ${reachedNear ? 'ok' : ''}">${reachedNear ? '✓ ' : ''}Near RX: ${b.target_near_rx} ${b.unit}</span>
-        <span class="badge ${reachedStrong ? 'ok' : ''}">${reachedStrong ? '✓ ' : ''}Sterk RX: ${b.target_strong_rx} ${b.unit}</span>
+        <span class="badge ${reachedNear ? 'ok' : ''}">${reachedNear ? '✓ ' : ''}Intermediate: ${b.target_near_rx} ${b.unit}</span>
+        <span class="badge ${reachedTussenstap ? 'ok' : ''}">${reachedTussenstap ? '✓ ' : ''}Tussenstap: ${b.target_tussenstap ?? '?'} ${b.unit}</span>
+        <span class="badge ${reachedStrong ? 'ok' : ''}">${reachedStrong ? '✓ ' : ''}RX: ${b.target_strong_rx} ${b.unit}</span>
       </div>
+      ${level === 4 && !fatigueConfirmed ? `<button type="button" class="secondary fatigueConfirmBtn" data-name="${b.name}" data-value="${value}" style="margin-top:8px;font-size:12px">Bevestig: RX bruikbaar onder vermoeidheid → niveau 5</button>` : ''}
       ${bmInlineFormHtml()}
     </div>`;
   }).join('');
@@ -643,6 +732,17 @@ async function renderDashboard() {
 // Tik op een RX-Readiness-rij (skill of lift) om er een inline invoer voor te openen/sluiten.
 // Klikken in het invoerveld zelf mag niet toggle'n (anders sluit het formulier zodra je typt).
 document.addEventListener('click', async (e) => {
+  const fatigueBtn = e.target.closest('.fatigueConfirmBtn');
+  if (fatigueBtn) {
+    const name = fatigueBtn.dataset.name;
+    const value = fatigueBtn.dataset.value;
+    const { data: { user } } = await sb.auth.getUser();
+    const { error } = await sb.from('benchmarks').insert({ user_id: user.id, name, value, date: localDateStr(), notes: 'fatigue-confirmed' });
+    if (error) { alert(error.message); return; }
+    renderDashboard();
+    return;
+  }
+
   const saveBtn = e.target.closest('.bmSaveBtn');
   if (saveBtn) {
     const row = saveBtn.closest('.benchmarkRow');
@@ -696,13 +796,19 @@ async function loadSkills() {
   benchmarkDefsCache = benchmarkDefsData || [];
   const { data: progressions } = await sb.from('skill_progressions').select('*').eq('user_id', user.id);
   progressionsCache = {};
-  (progressions || []).forEach(p => { progressionsCache[p.skill_id] = p.current_level_number ?? 0; });
+  frozenCache = {};
+  (progressions || []).forEach(p => {
+    progressionsCache[p.skill_id] = p.current_level_number ?? 0;
+    frozenCache[p.skill_id] = { frozen: !!p.frozen, reason: p.frozen_reason };
+  });
   skillsCache = (skillsData || []).map(s => ({
     ...s,
-    levels: (levelsData || []).filter(l => l.skill_id === s.id).map(l => ({
-      ...l,
-      exercises: (exercisesData || []).filter(e => e.skill_id === s.id && e.level_number === l.level_number).map(e => e.step_text)
-    })),
+    levels: (levelsData || []).filter(l => l.skill_id === s.id).map(l => {
+      const exercisesFor = (variant) => (exercisesData || [])
+        .filter(e => e.skill_id === s.id && e.level_number === l.level_number && e.variant === variant)
+        .map(e => e.step_text);
+      return { ...l, exercisesA: exercisesFor('a'), exercisesB: exercisesFor('b'), exercisesC: exercisesFor('c') };
+    }),
     conflicts: (conflictsData || []).filter(c => c.skill_id === s.id).reduce((acc, c) => { acc[c.muscle_group] = c.severity; return acc; }, {})
   }));
   const sel = document.getElementById('sk_skill');
@@ -745,13 +851,16 @@ document.getElementById('logSkillSession').addEventListener('click', async () =>
   const { data: { user } } = await sb.auth.getUser();
   const skillId = document.getElementById('sk_skill').value;
   const levelNumber = Number(document.getElementById('sk_level').value);
+  const variant = val('sk_variant');
   const quality = numval('sk_quality');
   const success = numval('sk_success');
+  const pain = numval('sk_pain');
   const notes = val('sk_notes');
   const today = localDateStr();
 
   const { error: e1 } = await sb.from('skill_sessions').insert({
-    user_id: user.id, skill_id: skillId, date: today, level_number: levelNumber, quality_score: quality, success_pct: success, notes
+    user_id: user.id, skill_id: skillId, date: today, level_number: levelNumber, variant,
+    quality_score: quality, success_pct: success, pain_score: pain, notes
   });
   if (e1) { alert(e1.message); return; }
 
@@ -761,10 +870,12 @@ document.getElementById('logSkillSession').addEventListener('click', async () =>
   progressionsCache[skillId] = levelNumber;
 
   const skill = skillsCache.find(s => s.id === skillId);
-  const nextLevel = await checkAndApplyLevelUp(user.id, skill, levelNumber, today);
+  const result = await evaluateSkillAfterSession(user.id, skill, levelNumber, today);
 
   await bumpWeeklyTarget(user.id, skill?.name, quality);
-  alert('Skill sessie opgeslagen.' + (nextLevel ? ` 🎉 Level omhoog: ${nextLevel.name}` : ''));
+  alert('Skill sessie opgeslagen.'
+    + (result?.nextLevel ? ` 🎉 Level omhoog: ${result.nextLevel.name}` : '')
+    + (result?.justFrozen ? ` 🚫 Tijdelijk bevroren: ${result.freezeReason}` : ''));
   populateSkLevelOptions();
   renderSkills();
 });

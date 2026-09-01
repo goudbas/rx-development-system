@@ -72,12 +72,23 @@
     return under[0] || null;
   }
 
-  function selectCandidate(weeklyTargets, componentsByName, soreMuscleGroups, timingExclude, excludeNames) {
+  function selectCandidate(weeklyTargets, componentsByName, soreMuscleGroups, timingExclude, excludeNames, frozenNames) {
     let candidates = (weeklyTargets || [])
       .filter(t => timingOf(t.component, componentsByName) !== timingExclude)
       .filter(t => !(excludeNames || []).includes(t.component));
 
-    const { normal, downgraded, notes } = classifyConflicts(candidates, soreMuscleGroups, componentsByName);
+    const notes = [];
+    const frozen = frozenNames || [];
+    candidates = candidates.filter(t => {
+      if (frozen.includes(t.component)) {
+        notes.push(`${t.component} is bevroren (safety freeze) — uitgesloten van aanbevelingen tot ontdooid.`);
+        return false;
+      }
+      return true;
+    });
+
+    const { normal, downgraded, notes: conflictNotes } = classifyConflicts(candidates, soreMuscleGroups, componentsByName);
+    notes.push(...conflictNotes);
 
     let pick = pickUnderTarget(normal);
     let downgradedNote = null;
@@ -95,7 +106,7 @@
   }
 
   // ---------- Voor de class: skill/mobility-advies o.b.v. weekly targets + spierpijn, NIET o.b.v. vandaag se class (die is nog onbekend). ----------
-  function computePreClassRecommendation({ logToday, weeklyTargets, components }) {
+  function computePreClassRecommendation({ logToday, weeklyTargets, components, frozenNames }) {
     const tier = classifyReadiness(logToday);
     const componentsByName = componentsToMap(components);
 
@@ -104,7 +115,7 @@
     }
 
     const excludeNames = tier === 'amber' ? ['Strength'] : [];
-    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'post', excludeNames);
+    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'post', excludeNames, frozenNames);
     if (tier === 'amber') notes.push('Strength uitgesloten: readiness AMBER.');
 
     if (!pick) {
@@ -121,7 +132,7 @@
   }
 
   // ---------- Na de class: strength/mobility-advies, houdt nu wél rekening met de zojuist gelogde class load. ----------
-  function computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components }) {
+  function computePostClassRecommendation({ logToday, classLoadToday, weeklyTargets, components, frozenNames }) {
     let tier = classifyReadiness(logToday);
     const componentsByName = componentsToMap(components);
 
@@ -146,7 +157,7 @@
     }
 
     const excludeNames = tier === 'amber' ? ['Strength'] : [];
-    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'pre', excludeNames);
+    const { pick, notes, downgradedNote } = selectCandidate(weeklyTargets, componentsByName, logToday?.sore_muscle_groups, 'pre', excludeNames, frozenNames);
     if (tier === 'amber' && excludeNames.includes('Strength')) {
       notes.push(cl?.overall_load === 'very_hard' ? 'Strength uitgesloten: zware class vandaag.' : 'Strength uitgesloten: readiness AMBER.');
     }
@@ -164,15 +175,43 @@
     };
   }
 
-  // Niveau-upgrade: minimaal `level.pass_sessions_min` OPEENVOLGENDE sessies (meest-recent-eerst
-  // in recentSessions) met quality_score >= level.pass_quality_min. Eén mindere sessie breekt de streak.
+  // Niveau-upgrade (coach-feedback): minimaal `level.pass_sessions_min` kwalificerende sessies
+  // (quality_score >= pass_quality_min) op dit niveau, waarvan minstens 1x Training A én 1x Training B —
+  // niet per se opeenvolgend, want A/B-afwisseling zou "consecutive" onnodig breken.
   function evaluateLevelUp({ recentSessions, level }) {
     if (!level || !level.pass_sessions_min) return false;
-    const need = level.pass_sessions_min;
     const qualityMin = level.pass_quality_min ?? 4;
-    const streak = (recentSessions || []).slice(0, need);
-    if (streak.length < need) return false;
-    return streak.every(s => (s.quality_score ?? 0) >= qualityMin);
+    const qualifying = (recentSessions || []).filter(s => (s.quality_score ?? 0) >= qualityMin);
+    if (qualifying.length < level.pass_sessions_min) return false;
+    const hasA = qualifying.some(s => s.variant === 'a');
+    const hasB = qualifying.some(s => s.variant === 'b');
+    // Skills zonder variant-data (bv. oude sessies vóór deze migratie) tellen niet mee voor de
+    // A/B-dekking, maar blokkeren de upgrade ook niet als er verder geen B-variant bestaat (variant='a' default).
+    return hasA && hasB;
+  }
+
+  // Kiest welke variant (A/B) het minst gelogd is op dit niveau, zodat het snelle ✓ Gedaan-tikje
+  // vanzelf afwisselt zonder een extra keuze-tik te kosten. Bij gelijkstand: A.
+  function pickVariant(recentSessions) {
+    const countFor = (v) => (recentSessions || []).filter(s => s.variant === v).length;
+    return countFor('a') <= countFor('b') ? 'a' : 'b';
+  }
+
+  // Automatische veiligheidsbevriezing: alleen wat betrouwbaar uit de sessie-historie af te leiden is.
+  // Andere triggers uit de coach-feedback (coach-flag, aanhoudende pijn na 48u) vereisen menselijke
+  // inschatting en lopen daarom via een handmatige bevriezen/ontdooien-knop in de UI, niet hier.
+  function evaluateSafetyFreeze({ recentSessions, level }) {
+    const sessions = recentSessions || [];
+    const last = sessions[0];
+    if (last && (last.pain_score ?? 0) > 2) {
+      return { frozen: true, reason: `Pijnscore ${last.pain_score}/10 gemeld bij de laatste sessie.` };
+    }
+    const qualityMin = level?.pass_quality_min ?? 4;
+    const lastTwo = sessions.slice(0, 2);
+    if (lastTwo.length === 2 && lastTwo.every(s => (s.quality_score ?? 0) < qualityMin)) {
+      return { frozen: true, reason: 'Twee sessies op rij onder de kwaliteitsdrempel — mogelijke terugval.' };
+    }
+    return { frozen: false, reason: null };
   }
 
   function currentWeekNumber(block) {
@@ -185,7 +224,7 @@
     MUSCLE_GROUPS,
     classifyReadiness,
     computePreClassRecommendation, computePostClassRecommendation, currentWeekNumber,
-    evaluateLevelUp
+    evaluateLevelUp, pickVariant, evaluateSafetyFreeze
   };
 
 })(window);
