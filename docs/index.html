@@ -5,49 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>RX Development System</title>
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0f172a" />
+<meta name="theme-color" content="#F4EEE3" />
 <link rel="icon" href="icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Karla:wght@400;500;600;700&display=swap" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="decision-engine.js"></script>
 <style>
   :root{
-    --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8;
-    --accent:#22c55e; --accent2:#3b82f6; --danger:#ef4444; --border:#334155;
+    --bg:oklch(0.95 0.02 75); --card:oklch(0.98 0.014 75); --text:oklch(0.28 0.03 55); --muted:oklch(0.52 0.02 60);
+    --accent:oklch(0.56 0.09 130); --accent2:oklch(0.56 0.09 130); --accent-ink:oklch(0.99 0.01 130);
+    --danger:oklch(0.54 0.17 25); --border:oklch(0.87 0.018 70);
   }
   *{box-sizing:border-box}
   html,body{height:100%;overscroll-behavior:none}
-  body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#0b1220,#111827);color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+  body{margin:0;font-family:'Karla',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
   .container{max-width:720px;margin:0 auto;padding:16px;width:100%}
   #loginScreen.container,#app.container{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
-  h1,h2,h3{margin:0 0 10px}
+  h1,h2,h3{margin:0 0 10px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600}
   p{color:var(--muted);margin:4px 0}
   label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
-  select,input,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:15px}
-  button{background:var(--accent2);border:none;font-weight:600;cursor:pointer;margin-top:12px}
-  button.secondary{background:#334155}
+  select,input,textarea,button{width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px}
+  button{background:var(--accent);color:var(--accent-ink);border:none;border-radius:999px;font-weight:700;cursor:pointer;margin-top:12px}
+  button.secondary{background:oklch(0.89 0.016 65);color:var(--text)}
   button.small{width:auto;padding:6px 10px;margin:0;font-size:13px}
-  .card{background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:14px;padding:16px;margin:14px 0;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;margin:14px 0;box-shadow:0 10px 26px oklch(0.4 0.06 60 / 0.10)}
   .row{display:flex;gap:10px}
   .row>*{flex:1}
   .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600}
-  .badge.ok{background:rgba(34,197,94,.15);color:var(--accent)}
-  .badge.warn{background:rgba(239,68,68,.15);color:var(--danger)}
-  .bar{width:100%;height:10px;background:#1e293b;border-radius:999px;overflow:hidden;margin-top:6px}
-  .bar>div{height:100%;background:linear-gradient(90deg,var(--accent),#84cc16)}
-  .rec{margin-top:12px;padding:14px;border-radius:12px;background:#07111f;border:1px solid #1d4ed8}
+  .badge.ok{background:oklch(from var(--accent) l c h / 0.14);color:var(--accent)}
+  .badge.warn{background:oklch(from var(--danger) l c h / 0.14);color:var(--danger)}
+  .bar{width:100%;height:10px;background:var(--border);border-radius:999px;overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:var(--accent)}
+  .rec{margin-top:12px;padding:14px;border-radius:16px;background:oklch(from var(--accent) l c h / 0.08);border:1px solid oklch(from var(--accent) l c h / 0.32)}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
-  nav{flex:0 0 auto;background:#0b1220;border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
-  nav button{flex:1;background:transparent;border:none;color:var(--muted);font-size:12px;margin:0;padding:8px 2px}
-  nav button.active{color:var(--accent2);font-weight:700}
+  nav{flex:0 0 auto;display:flex;gap:2px;margin:0 12px calc(10px + env(safe-area-inset-bottom));padding:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 10px 24px oklch(0.4 0.06 60 / 0.10)}
+  nav button{flex:1;background:transparent;border:none;color:var(--muted);font-size:11px;font-weight:600;margin:0;padding:8px 2px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  nav button svg{width:19px;height:19px}
+  nav button.active{background:var(--accent);color:var(--accent-ink)}
   .hidden{display:none}
   .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-  .tag{background:#0b1220;border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted)}
+  .tag{background:oklch(from var(--accent) l c h / 0.12);border:none;border-radius:999px;padding:4px 10px;font-size:12px;color:var(--accent);font-weight:600}
   #loginScreen{max-width:360px;margin:80px auto}
   .err{color:var(--danger);font-size:13px;min-height:18px}
   .chip-group{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-  .chip{width:auto;flex:none;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:14px;font-weight:500;cursor:pointer;margin:0}
-  .chip.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+  .chip{width:auto;flex:none;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;margin:0}
+  .chip.active{background:var(--accent2);border-color:var(--accent2);color:var(--accent-ink)}
   .chip-group.scale .chip{padding:10px 14px;min-width:44px;text-align:center}
   details{margin-top:16px}
   details summary{cursor:pointer;color:var(--accent2);font-weight:600;padding:6px 0;list-style:none}
@@ -61,6 +65,7 @@
 
 <div id="loginScreen" class="container hidden">
   <div class="card">
+    <div style="width:44px;height:44px;border-radius:999px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:16px;margin-bottom:12px">RX</div>
     <h1>RX Development System</h1>
     <p>Log in met je persoonlijke account.</p>
     <label>E-mail</label>
@@ -165,13 +170,14 @@
       <div id="readinessList">Laden...</div>
     </div>
     <div class="card">
-      <h3>Grootste limiter</h3>
-      <div id="limiter" class="rec">-</div>
-    </div>
-    <div class="card">
       <h3>RX Readiness — Kracht</h3>
       <p style="font-size:13px;margin-top:-4px">Tik op een lift om een nieuwe waarde te loggen.</p>
       <div id="strengthList">Laden...</div>
+    </div>
+    <div class="card">
+      <h3>Benchmark WODs</h3>
+      <p style="font-size:13px;margin-top:-4px">Tik op een WOD om een score te loggen.</p>
+      <div id="wodList">Laden...</div>
     </div>
   </section>
 
@@ -225,11 +231,11 @@
 </div>
 
 <nav id="navbar" class="hidden">
-  <button data-tab="today" class="active">Today</button>
-  <button data-tab="dashboard">Dashboard</button>
-  <button data-tab="log">Log</button>
-  <button data-tab="skills">Skills</button>
-  <button data-tab="block">Block</button>
+  <button data-tab="today" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M9 12l2 2 4-4"></path></svg>Today</button>
+  <button data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V13"></path><path d="M12 19V7"></path><path d="M19 19V10"></path></svg>Dashboard</button>
+  <button data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h9"></path></svg>Log</button>
+  <button data-tab="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5 5.6.6-4.2 3.7 1.2 5.5-4.8-3-4.8 3 1.2-5.5-4.2-3.7 5.6-.6z"></path></svg>Skills</button>
+  <button data-tab="block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l8 4-8 4-8-4 8-4z"></path><path d="M4 13l8 4 8-4"></path></svg>Block</button>
 </nav>
 
 <script>
@@ -241,7 +247,7 @@ const { MUSCLE_GROUPS } = DecisionEngine;
 
 function trainingListHtml(label, exercises) {
   if (!exercises || !exercises.length) return '';
-  return `<div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px">
+  return `<div style="margin-top:10px;padding:8px 10px;background:oklch(from var(--text) l c h / 0.05);border-radius:10px">
     <span class="tag">${label}</span>
     <ul style="margin:6px 0 0 18px;padding:0">${exercises.map(s => `<li>${s}</li>`).join('')}</ul>
   </div>`;
@@ -260,7 +266,7 @@ function contentHtml(component) {
   const allLevelsHtml = levels.map(l => `<li>${l.level_number === curNum ? '<strong>→ ' : (l.level_number < curNum ? '✓ ' : '')}Niveau ${l.level_number + 1}: ${l.name}${l.level_number === curNum ? '</strong>' : ''}</li>`).join('');
   return `<div style="margin-top:10px">
     ${timingLabel ? `<span class="tag">${timingLabel}</span>` : ''}
-    ${frozen?.frozen ? `<div class="rec" style="margin-top:8px;border-color:var(--danger)">
+    ${frozen?.frozen ? `<div class="rec" style="margin-top:8px;border-color:oklch(from var(--danger) l c h / 0.35);background:oklch(from var(--danger) l c h / 0.08)">
       <strong>🚫 Bevroren:</strong> ${frozen.reason}
       <button type="button" class="secondary unfreezeBtn" data-skill-id="${c.id}" style="margin-top:8px">Ontdooien</button>
     </div>` : ''}
@@ -658,6 +664,21 @@ function bmInlineFormHtml() {
   </div>`;
 }
 
+// Score-invoer is per WOD anders (tijd/reps/ronden+reps/load), vandaar een los formulier i.p.v.
+// hergebruik van bmInlineFormHtml — die gaat uit van één numerieke waarde.
+function wodInlineFormHtml(scoreType) {
+  const placeholder = scoreType === 'time' ? 'mm:ss' : scoreType === 'rounds_reps' ? 'bv. 12+4' : 'aantal';
+  const numeric = scoreType === 'load' || scoreType === 'reps';
+  return `<div class="wodInlineForm" style="margin-top:8px;gap:8px;display:none;flex-direction:column">
+    <input type="${numeric ? 'number' : 'text'}" ${numeric ? 'step="0.1"' : ''} class="wodInlineInput" placeholder="${placeholder}" style="padding:14px;font-size:17px" />
+    <div class="chip-group">
+      <button type="button" class="chip wodRxChip" data-value="true">Rx</button>
+      <button type="button" class="chip wodRxChip" data-value="false">Scaled</button>
+    </div>
+    <button type="button" class="secondary wodSaveBtn" style="margin:0">Opslaan</button>
+  </div>`;
+}
+
 // ---------- Dashboard ----------
 async function renderDashboard() {
   const { data: { user } } = await sb.auth.getUser();
@@ -683,17 +704,11 @@ async function renderDashboard() {
       <div class="bar"><div style="width:${r.pct}%"></div></div>
       ${bmInlineFormHtml()}
     </div>`).join('');
-  const limiter = rows[0];
-  document.getElementById('limiter').innerHTML = limiter
-    ? `<strong>${limiter.name}</strong> (${limiter.pct}% van RX-ready criterium).
-       ${contentHtml(limiter.name)}
-       ${doneButtonHtml(limiter.name)}`
-    : 'Nog geen benchmarks gelogd.';
 
   // Kracht staat los van de skills: geen "Wat doe ik?"-content/done-knop (dat bestaat alleen voor
   // skills), en toont beide RX-doelen naast elkaar i.p.v. één voortgangs-percentage.
   const strengthEl = document.getElementById('strengthList');
-  strengthEl.innerHTML = benchmarkDefsCache.map(b => {
+  strengthEl.innerHTML = benchmarkDefsCache.filter(b => b.category === 'strength').map(b => {
     const latest = latestFor(b.name);
     const value = latest ? Number(latest.value) : null;
     const pct = value && b.target_near_rx ? Math.min(100, Math.round((value / b.target_near_rx) * 100)) : 0;
@@ -727,6 +742,28 @@ async function renderDashboard() {
       ${bmInlineFormHtml()}
     </div>`;
   }).join('');
+
+  // Benchmark WODs: puur registratie + korte geschiedenis, geen RX-tiers/PR-badge (tijd vs.
+  // reps zijn niet 1-op-1 vergelijkbaar) — history komt uit de al opgehaalde `benchmarks`-array.
+  const wodEl = document.getElementById('wodList');
+  wodEl.innerHTML = benchmarkDefsCache.filter(b => b.category === 'wod').map(b => {
+    const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
+    const latest = history[0];
+    const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
+    const historyHtml = history.length
+      ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
+      : `<p style="font-size:13px;color:var(--muted);margin-top:6px">Nog niet gelogd.</p>`;
+    return `
+    <div class="benchmarkRow" data-name="${b.name}" style="margin:12px 0;cursor:pointer">
+      <div class="row" style="justify-content:space-between">
+        <strong>${b.name}</strong>
+        <span class="badge ${latest ? 'ok' : ''}">${latest ? `${latest.value}${rxLabel(latest)}` : 'nog niet gelogd'}</span>
+      </div>
+      <p style="font-size:13px;margin:4px 0 0">${b.workout_description || ''}</p>
+      ${historyHtml}
+      ${wodInlineFormHtml(b.score_type)}
+    </div>`;
+  }).join('');
 }
 
 // Tik op een RX-Readiness-rij (skill of lift) om er een inline invoer voor te openen/sluiten.
@@ -756,10 +793,33 @@ document.addEventListener('click', async (e) => {
     renderDashboard();
     return;
   }
-  if (e.target.closest('.bmInlineForm')) return;
+  const rxChip = e.target.closest('.wodRxChip');
+  if (rxChip) {
+    rxChip.parentElement.querySelectorAll('.wodRxChip').forEach(c => c.classList.remove('active'));
+    rxChip.classList.add('active');
+    return;
+  }
+
+  const wodSaveBtn = e.target.closest('.wodSaveBtn');
+  if (wodSaveBtn) {
+    const row = wodSaveBtn.closest('.benchmarkRow');
+    const name = row.dataset.name;
+    const form = wodSaveBtn.closest('.wodInlineForm');
+    const value = form.querySelector('.wodInlineInput').value.trim();
+    if (!value) { alert('Vul een score in.'); return; }
+    const rxSelected = form.querySelector('.wodRxChip.active');
+    const rx = rxSelected ? rxSelected.dataset.value === 'true' : null;
+    const { data: { user } } = await sb.auth.getUser();
+    const { error } = await sb.from('benchmarks').insert({ user_id: user.id, name, value, date: localDateStr(), rx });
+    if (error) { alert(error.message); return; }
+    renderDashboard();
+    return;
+  }
+
+  if (e.target.closest('.bmInlineForm') || e.target.closest('.wodInlineForm')) return;
   const bmRow = e.target.closest('.benchmarkRow');
   if (bmRow) {
-    const form = bmRow.querySelector('.bmInlineForm');
+    const form = bmRow.querySelector('.bmInlineForm') || bmRow.querySelector('.wodInlineForm');
     if (form) form.style.display = form.style.display === 'none' ? 'flex' : 'none';
   }
 });
