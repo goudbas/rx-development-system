@@ -138,60 +138,16 @@
 
     <div class="card">
       <h3>Na de class</h3>
-      <label>Hoe was de class? (overall)</label>
-      <div class="chip-group" data-field="overall_load">
-        <button type="button" class="chip" data-value="easy">easy</button>
-        <button type="button" class="chip" data-value="moderate">moderate</button>
-        <button type="button" class="chip" data-value="hard">hard</button>
-        <button type="button" class="chip" data-value="very_hard">very hard</button>
-      </div>
+      <label>Hoe zwaar was de training? (RPE <span id="today_rpe_val">5</span>/10)</label>
+      <input id="today_rpe" type="range" min="1" max="10" value="5" style="width:100%" />
+      <p style="font-size:13px;margin-top:2px">1 = hersteltraining, 10 = totale uitputting</p>
 
-      <details>
-        <summary>Meer detail (optioneel)</summary>
-        <div class="detail-body">
-          <label>Legs</label>
-          <div class="chip-group" data-field="legs">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Pulling</label>
-          <div class="chip-group" data-field="pulling">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Pushing</label>
-          <div class="chip-group" data-field="pushing">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Overhead</label>
-          <div class="chip-group" data-field="overhead">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Gymnastics</label>
-          <div class="chip-group" data-field="gymnastics">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Conditioning</label>
-          <div class="chip-group" data-field="conditioning">
-            <button type="button" class="chip" data-value="low">low</button>
-            <button type="button" class="chip" data-value="moderate">moderate</button>
-            <button type="button" class="chip" data-value="high">high</button>
-          </div>
-          <label>Olympic lifting</label>
-          <div class="chip-group" data-field="olympic_lifting">
-            <button type="button" class="chip active" data-value="false">nee</button>
-            <button type="button" class="chip" data-value="true">ja</button>
-          </div>
-        </div>
-      </details>
+      <label>Wat voor type training was het?</label>
+      <div class="chip-group" data-field="workout_type">
+        <button type="button" class="chip" data-value="cardio">Cardio</button>
+        <button type="button" class="chip" data-value="strength">Kracht</button>
+        <button type="button" class="chip" data-value="mixed">Mix</button>
+      </div>
 
       <button id="logPostClassBtn">Log class &amp; advies (na de class)</button>
     </div>
@@ -445,10 +401,14 @@ function numval(id) { const v = document.getElementById(id).value; return v === 
 
 // ---------- Today: chip state ----------
 const todayState = {
-  overall_load: null, readiness: null, pain_level: 'none', pain_location: '', sore_muscle_groups: [],
-  legs: null, pulling: null, pushing: null, overhead: null, gymnastics: null, conditioning: null,
-  olympic_lifting: 'false', fatigue: null, soreness: null, sleep: null
+  rpe: 5, workout_type: null, readiness: null, pain_level: 'none', pain_location: '', sore_muscle_groups: [],
+  fatigue: null, soreness: null, sleep: null
 };
+
+document.getElementById('today_rpe').addEventListener('input', (e) => {
+  todayState.rpe = Number(e.target.value);
+  document.getElementById('today_rpe_val').textContent = e.target.value;
+});
 
 document.getElementById('soreMuscleGroups').innerHTML = MUSCLE_GROUPS
   .map(g => `<button type="button" class="chip" data-value="${g.id}">${g.label}</button>`).join('');
@@ -522,6 +482,15 @@ async function renderPreClassRecommendation(logToCoach) {
 // ---------- Today: na de class (class load loggen + strength/mobility-advies) ----------
 document.getElementById('logPostClassBtn').addEventListener('click', logPostClass);
 
+// Behoudt compatibiliteit met bestaande logica/weergave (Log-tab, "very_hard"-tier-bump) die op
+// het oude overall_load-enum leunt, ook al komt de waarde nu van de RPE-schuifbalk.
+function rpeToOverallLoad(rpe) {
+  if (rpe >= 9) return 'very_hard';
+  if (rpe >= 7) return 'hard';
+  if (rpe >= 4) return 'moderate';
+  return 'easy';
+}
+
 async function logPostClass() {
   const out = document.getElementById('recommendationPost');
   out.textContent = 'Opslaan...';
@@ -533,10 +502,8 @@ async function logPostClass() {
   if (sErr) { out.textContent = sErr.message; return; }
   const clPayload = {
     user_id: user.id, training_session_id: session.id,
-    legs: todayState.legs, pulling: todayState.pulling, pushing: todayState.pushing,
-    overhead: todayState.overhead, gymnastics: todayState.gymnastics,
-    olympic_lifting: todayState.olympic_lifting === 'true',
-    conditioning: todayState.conditioning, overall_load: todayState.overall_load
+    rpe: todayState.rpe, workout_type: todayState.workout_type,
+    overall_load: rpeToOverallLoad(todayState.rpe)
   };
   const { error: clErr } = await sb.from('class_loads').insert(clPayload);
   if (clErr) { out.textContent = clErr.message; return; }
@@ -813,11 +780,55 @@ async function bumpWeeklyTarget(userId, componentName, qualityScore) {
 }
 
 // ---------- Block ----------
+// ---------- Block: nieuw blok aanmaken (dynamische componentenlijst) ----------
+let newBlockComponents = [];
+
+function skillOptionsHtml(excludeNames) {
+  return skillsCache
+    .filter(s => !(excludeNames || []).includes(s.name))
+    .map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+}
+
+// null = skill heeft ≤1 niveau, geen zinvolle keuze (zelfde uitgangspunt als levelOverrideHtml op Skills).
+function levelOptionsForSkill(skillName) {
+  const skill = skillsCache.find(s => s.name === skillName);
+  const levels = skill?.levels || [];
+  if (levels.length <= 1) return null;
+  const curNum = skill ? (progressionsCache[skill.id] ?? 0) : 0;
+  return levels.map(l => `<option value="${l.level_number}" ${l.level_number === curNum ? 'selected' : ''}>Niveau ${l.level_number + 1}: ${l.name}</option>`).join('');
+}
+
+// Toont/verbergt en vult de niveau-select bij het "component toevoegen"-formulier, afhankelijk
+// van welke component nu gekozen is (herbruikt voor zowel nieuw-blok als lopend-blok).
+function updateLevelSelectFor(componentSelectId, wrapId, levelSelectId) {
+  const componentName = document.getElementById(componentSelectId)?.value;
+  const wrap = document.getElementById(wrapId);
+  const select = document.getElementById(levelSelectId);
+  if (!wrap || !select) return;
+  const opts = componentName ? levelOptionsForSkill(componentName) : null;
+  if (!opts) { wrap.classList.add('hidden'); select.innerHTML = ''; return; }
+  wrap.classList.remove('hidden');
+  select.innerHTML = opts;
+}
+
+function renderNewBlockComponentsList() {
+  const el = document.getElementById('nb_components_list');
+  if (!el) return;
+  el.innerHTML = newBlockComponents.length
+    ? newBlockComponents.map((c, i) => `
+      <div class="row" style="align-items:center;margin:6px 0">
+        <span style="flex:1">${c.component} (${c.min}-${c.max})${c.level != null ? ` — niveau ${c.level + 1}` : ''}</span>
+        <button type="button" class="secondary nbRemoveBtn" data-index="${i}" style="flex:none">✕</button>
+      </div>`).join('')
+    : '<p style="font-size:13px">Nog geen componenten toegevoegd.</p>';
+}
+
 async function renderBlock() {
   const { data: { user } } = await sb.auth.getUser();
   const block = await getActiveBlock(user.id);
   const view = document.getElementById('blockView');
   if (!block) {
+    newBlockComponents = [];
     view.innerHTML = `<div class="card">
       <h3>Geen actief blok</h3>
       <label>Startdatum</label><input id="nb_start" type="date" value="${localDateStr()}" />
@@ -826,22 +837,83 @@ async function renderBlock() {
       <label>Secondary goals</label><input id="nb_secondary" type="text" placeholder="Schouder stability, onderhoud pulling" />
       <label>Exit criteria</label><input id="nb_exit" type="text" placeholder="30+ DU ongebroken, 5m+ HSW" />
       <h3 style="margin-top:16px">Weekly targets (min-max per week)</h3>
-      <div class="row"><div><label>Double Unders</label><input id="wt_du_min" type="number" value="2" /></div><div><label>max</label><input id="wt_du_max" type="number" value="4" /></div></div>
-      <div class="row"><div><label>Handstand Walk</label><input id="wt_hsw_min" type="number" value="1" /></div><div><label>max</label><input id="wt_hsw_max" type="number" value="3" /></div></div>
-      <div class="row"><div><label>Strength</label><input id="wt_str_min" type="number" value="0" /></div><div><label>max</label><input id="wt_str_max" type="number" value="2" /></div></div>
-      <button id="createBlock">Blok aanmaken</button>
+      <div id="nb_components_list"></div>
+      <label>Component</label><select id="nb_new_component">${skillOptionsHtml()}</select>
+      <div id="nb_new_level_wrap"><label>Startniveau</label><select id="nb_new_level"></select></div>
+      <div class="row" style="align-items:flex-end;margin-top:8px">
+        <div style="flex:1"><label>min</label><input id="nb_new_min" type="number" value="1" /></div>
+        <div style="flex:1"><label>max</label><input id="nb_new_max" type="number" value="3" /></div>
+        <button type="button" id="nbAddComponentBtn" class="secondary" style="flex:none;width:auto;padding:10px 12px">+ Voeg toe</button>
+      </div>
+      <button id="createBlock" style="margin-top:16px">Blok aanmaken</button>
     </div>`;
+    renderNewBlockComponentsList();
     document.getElementById('createBlock').addEventListener('click', createBlock);
+    document.getElementById('nb_new_component').addEventListener('change', () => updateLevelSelectFor('nb_new_component', 'nb_new_level_wrap', 'nb_new_level'));
+    updateLevelSelectFor('nb_new_component', 'nb_new_level_wrap', 'nb_new_level');
     return;
   }
   const weekNum = currentWeekNumber(block);
   const { data: targets } = await sb.from('weekly_targets').select('*').eq('block_id', block.id).eq('week_number', weekNum);
+  const trackedNames = (targets || []).map(t => t.component);
+
+  let totalWeeks = block.total_weeks;
+  if (totalWeeks == null) {
+    const { data: last } = await sb.from('weekly_targets').select('week_number').eq('block_id', block.id).order('week_number', { ascending: false }).limit(1).maybeSingle();
+    totalWeeks = last?.week_number ?? null;
+  }
+  const remaining = totalWeeks != null ? Math.max(0, totalWeeks - weekNum) : null;
+  const weekTagText = totalWeeks != null
+    ? `Week ${weekNum} van ${totalWeeks}${remaining > 0 ? ` — nog ${remaining} week${remaining === 1 ? '' : 'en'}` : ' — laatste week'}`
+    : `Week ${weekNum}`;
+
   view.innerHTML = `<div class="card">
     <h3>Actief blok sinds ${block.start_date}</h3>
     <p><strong>Primary:</strong> ${(block.primary_goals || []).join(', ')}</p>
     <p><strong>Secondary:</strong> ${(block.secondary_goals || []).join(', ')}</p>
     <p><strong>Exit criteria:</strong> ${block.exit_criteria || '-'}</p>
-    <div class="tag-row"><span class="tag">Week ${weekNum}</span></div>
+    <div class="tag-row"><span class="tag">${weekTagText}</span></div>
+    ${totalWeeks != null ? `<div class="bar"><div style="width:${Math.min(100, Math.round(weekNum / totalWeeks * 100))}%"></div></div>` : ''}
+
+    <details style="margin-top:12px">
+      <summary>Blok instellingen</summary>
+      <div class="detail-body">
+        <label>Primary goals (komma-gescheiden)</label>
+        <input id="eb_primary" type="text" value="${(block.primary_goals || []).join(', ')}" />
+        <label>Secondary goals</label>
+        <input id="eb_secondary" type="text" value="${(block.secondary_goals || []).join(', ')}" />
+        <label>Exit criteria</label>
+        <input id="eb_exit" type="text" value="${block.exit_criteria || ''}" />
+        <button type="button" id="saveBlockBtn">Doelen opslaan</button>
+        <button type="button" id="endBlockBtn" class="secondary">Blok beëindigen</button>
+
+        <h3 style="margin-top:16px">Componenten (wijzigingen gelden vanaf week ${weekNum})</h3>
+        ${(targets || []).map(t => {
+          const levelOpts = levelOptionsForSkill(t.component);
+          return `
+          <div data-component="${t.component}" style="margin:14px 0;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <strong>${t.component}</strong>
+            <div class="row" style="align-items:flex-end;margin-top:6px">
+              <div style="flex:1"><label>min</label><input type="number" class="wtMinInput" value="${t.target_min}" /></div>
+              <div style="flex:1"><label>max</label><input type="number" class="wtMaxInput" value="${t.target_max}" /></div>
+            </div>
+            ${levelOpts ? `<label>Niveau</label><select class="wtLevelInput">${levelOpts}</select>` : ''}
+            <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px">
+              <button type="button" class="secondary wtUpdateBtn" style="flex:none;width:auto;padding:10px 12px">Bijwerken</button>
+              <button type="button" class="secondary wtDeleteBtn" style="flex:none;width:auto;padding:10px 12px">✕</button>
+            </div>
+          </div>`;
+        }).join('') || '<p style="font-size:13px">Nog geen componenten deze week.</p>'}
+
+        <label>Component toevoegen</label><select id="wt_new_component">${skillOptionsHtml(trackedNames)}</select>
+        <div id="wt_new_level_wrap"><label>Startniveau</label><select id="wt_new_level"></select></div>
+        <div class="row" style="align-items:flex-end;margin-top:8px">
+          <div style="flex:1"><label>min</label><input id="wt_new_min" type="number" value="1" /></div>
+          <div style="flex:1"><label>max</label><input id="wt_new_max" type="number" value="3" /></div>
+          <button type="button" id="wtAddBtn" class="secondary" style="flex:none;width:auto;padding:10px 12px">+ Toevoegen</button>
+        </div>
+      </div>
+    </details>
   </div>
   <div class="card"><h3>Weekly targets — deze week</h3>
     ${(targets || []).map(t => `<div style="margin:14px 0">
@@ -856,6 +928,12 @@ async function renderBlock() {
       ${skillsCache.some(s => s.name === t.component) ? `<details><summary>Wat doe ik?</summary><div class="detail-body">${contentHtml(t.component)}</div></details>` : ''}
     </div>`).join('') || '<p>Geen targets voor deze week.</p>'}
   </div>`;
+
+  const wtNewComponentSel = document.getElementById('wt_new_component');
+  if (wtNewComponentSel) {
+    wtNewComponentSel.addEventListener('change', () => updateLevelSelectFor('wt_new_component', 'wt_new_level_wrap', 'wt_new_level'));
+    updateLevelSelectFor('wt_new_component', 'wt_new_level_wrap', 'wt_new_level');
+  }
 }
 
 async function createBlock() {
@@ -865,24 +943,134 @@ async function createBlock() {
   const primary = val('nb_primary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
   const secondary = val('nb_secondary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
   const exit = val('nb_exit');
+  if (!newBlockComponents.length) { alert('Voeg minimaal 1 component toe.'); return; }
 
   const { data: block, error } = await sb.from('training_blocks').insert({
-    user_id: user.id, start_date: start, primary_goals: primary, secondary_goals: secondary, exit_criteria: exit, status: 'active'
+    user_id: user.id, start_date: start, total_weeks: weeks, primary_goals: primary, secondary_goals: secondary, exit_criteria: exit, status: 'active'
   }).select().single();
   if (error) { alert(error.message); return; }
 
-  const template = [
-    { component: 'Double Unders', min: numval('wt_du_min'), max: numval('wt_du_max') },
-    { component: 'Handstand Walk', min: numval('wt_hsw_min'), max: numval('wt_hsw_max') },
-    { component: 'Strength', min: numval('wt_str_min'), max: numval('wt_str_max') }
-  ];
   const rows = [];
   for (let w = 1; w <= weeks; w++) {
-    template.forEach(t => rows.push({ user_id: user.id, block_id: block.id, week_number: w, component: t.component, target_min: t.min, target_max: t.max, actual_count: 0 }));
+    newBlockComponents.forEach(t => rows.push({ user_id: user.id, block_id: block.id, week_number: w, component: t.component, target_min: t.min, target_max: t.max, actual_count: 0 }));
   }
   const { error: e2 } = await sb.from('weekly_targets').insert(rows);
-  if (e2) alert(e2.message); else { alert('Blok aangemaakt.'); renderBlock(); }
+  if (e2) { alert(e2.message); return; }
+  for (const c of newBlockComponents) {
+    if (c.level != null) await setSkillLevel(user.id, c.component, c.level);
+  }
+  alert('Blok aangemaakt.');
+  renderBlock();
 }
+
+async function setSkillLevel(userId, componentName, levelNumber) {
+  const skill = skillsCache.find(s => s.name === componentName);
+  if (!skill) return;
+  await sb.from('skill_progressions').upsert({
+    user_id: userId, skill_id: skill.id, current_level_number: levelNumber
+  }, { onConflict: 'user_id,skill_id' });
+  progressionsCache[skill.id] = levelNumber;
+}
+
+// ---------- Block: lopend blok bewerken (doelen, componenten toevoegen/bijwerken/verwijderen) ----------
+document.addEventListener('click', async (e) => {
+  const nbAddBtn = e.target.closest('#nbAddComponentBtn');
+  if (nbAddBtn) {
+    const component = document.getElementById('nb_new_component').value;
+    const min = numval('nb_new_min');
+    const max = numval('nb_new_max');
+    if (!component || min == null || max == null) { alert('Kies een component en vul min/max in.'); return; }
+    const levelWrap = document.getElementById('nb_new_level_wrap');
+    const level = levelWrap && !levelWrap.classList.contains('hidden') ? Number(document.getElementById('nb_new_level').value) : null;
+    newBlockComponents.push({ component, min, max, level });
+    renderNewBlockComponentsList();
+    document.getElementById('nb_new_component').innerHTML = skillOptionsHtml(newBlockComponents.map(c => c.component));
+    updateLevelSelectFor('nb_new_component', 'nb_new_level_wrap', 'nb_new_level');
+    return;
+  }
+  const nbRemoveBtn = e.target.closest('.nbRemoveBtn');
+  if (nbRemoveBtn) {
+    newBlockComponents.splice(Number(nbRemoveBtn.dataset.index), 1);
+    renderNewBlockComponentsList();
+    document.getElementById('nb_new_component').innerHTML = skillOptionsHtml(newBlockComponents.map(c => c.component));
+    updateLevelSelectFor('nb_new_component', 'nb_new_level_wrap', 'nb_new_level');
+    return;
+  }
+
+  const saveBlockBtn = e.target.closest('#saveBlockBtn');
+  const endBlockBtn = e.target.closest('#endBlockBtn');
+  const wtUpdateBtn = e.target.closest('.wtUpdateBtn');
+  const wtDeleteBtn = e.target.closest('.wtDeleteBtn');
+  const wtAddBtn = e.target.closest('#wtAddBtn');
+  if (!saveBlockBtn && !endBlockBtn && !wtUpdateBtn && !wtDeleteBtn && !wtAddBtn) return;
+
+  const { data: { user } } = await sb.auth.getUser();
+  const block = await getActiveBlock(user.id);
+  if (!block) return;
+  const weekNum = currentWeekNumber(block);
+
+  if (endBlockBtn) {
+    if (!confirm('Dit blok beëindigen? Je kunt daarna direct een nieuw blok starten.')) return;
+    const { error } = await sb.from('training_blocks').update({ status: 'completed', end_date: localDateStr() }).eq('id', block.id);
+    if (error) { alert(error.message); return; }
+    renderBlock();
+    return;
+  }
+
+  if (saveBlockBtn) {
+    const primary = val('eb_primary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    const secondary = val('eb_secondary')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    const exit = val('eb_exit');
+    const { error } = await sb.from('training_blocks').update({ primary_goals: primary, secondary_goals: secondary, exit_criteria: exit }).eq('id', block.id);
+    if (error) { alert(error.message); return; }
+    renderBlock();
+    return;
+  }
+
+  if (wtUpdateBtn) {
+    const row = wtUpdateBtn.closest('[data-component]');
+    const component = row.dataset.component;
+    const min = Number(row.querySelector('.wtMinInput').value);
+    const max = Number(row.querySelector('.wtMaxInput').value);
+    const levelSelect = row.querySelector('.wtLevelInput');
+    const { error } = await sb.from('weekly_targets').update({ target_min: min, target_max: max })
+      .eq('block_id', block.id).eq('component', component).gte('week_number', weekNum);
+    if (error) { alert(error.message); return; }
+    if (levelSelect) await setSkillLevel(user.id, component, Number(levelSelect.value));
+    renderBlock();
+    return;
+  }
+
+  if (wtDeleteBtn) {
+    const row = wtDeleteBtn.closest('[data-component]');
+    const component = row.dataset.component;
+    if (!confirm(`${component} verwijderen vanaf week ${weekNum}? Eerdere weken blijven staan.`)) return;
+    const { error } = await sb.from('weekly_targets').delete()
+      .eq('block_id', block.id).eq('component', component).gte('week_number', weekNum);
+    if (error) { alert(error.message); return; }
+    renderBlock();
+    return;
+  }
+
+  if (wtAddBtn) {
+    const component = document.getElementById('wt_new_component').value;
+    const min = numval('wt_new_min');
+    const max = numval('wt_new_max');
+    if (!component || min == null || max == null) { alert('Kies een component en vul min/max in.'); return; }
+    const levelWrap = document.getElementById('wt_new_level_wrap');
+    const level = levelWrap && !levelWrap.classList.contains('hidden') ? Number(document.getElementById('wt_new_level').value) : null;
+    const { data: last } = await sb.from('weekly_targets').select('week_number').eq('block_id', block.id).order('week_number', { ascending: false }).limit(1).maybeSingle();
+    const lastWeek = last?.week_number ?? weekNum;
+    const rows = [];
+    for (let w = weekNum; w <= lastWeek; w++) {
+      rows.push({ user_id: user.id, block_id: block.id, week_number: w, component, target_min: min, target_max: max, actual_count: 0 });
+    }
+    const { error } = await sb.from('weekly_targets').insert(rows);
+    if (error) { alert(error.message); return; }
+    if (level != null) await setSkillLevel(user.id, component, level);
+    renderBlock();
+  }
+});
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 init();

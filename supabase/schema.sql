@@ -473,6 +473,16 @@ create policy "benchmark_definitions_read" on benchmark_definitions for select u
 -- created_at lost dat op zodat de nieuwste log altijd als "laatste waarde" telt.
 alter table benchmarks add column if not exists created_at timestamptz not null default now();
 
+-- Bewaart de bij aanmaak opgegeven bloklengte, zodat "week X van Y" getoond kan worden
+-- zonder te vertrouwen op hoeveel weekly_targets-rijen er toevallig nog bestaan.
+alter table training_blocks add column if not exists total_weeks int;
+
+-- ============ Migratie: na-de-class-invoer vereenvoudigd naar RPE + workout-type ============
+-- (i.p.v. de losse legs/pulling/pushing/overhead/gymnastics/conditioning/olympic_lifting-chips,
+-- die op één na (overhead/pulling, voor de schouder-veiligheidsregel) nergens werden uitgelezen).
+alter table class_loads add column if not exists rpe int check (rpe between 1 and 10);
+alter table class_loads add column if not exists workout_type text check (workout_type in ('cardio', 'strength', 'mixed'));
+
 insert into benchmark_definitions (name, sort_order, target_near_rx, target_strong_rx) values
   ('Back Squat', 0, 140, 180),
   ('Front Squat', 1, 120, 150),

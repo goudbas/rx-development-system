@@ -132,12 +132,15 @@
     const cl = classLoadToday;
     if (cl?.overall_load === 'very_hard' && tier === 'green') tier = 'amber';
 
-    const shoulderLoadedToday = cl && (cl.overhead === 'high' || cl.pulling === 'high');
+    // Sinds de na-de-class-invoer vereenvoudigd is naar RPE + workout-type (geen losse
+    // overhead/pulling-chips meer), is dit een grovere proxy voor "vandaag zwaar op de
+    // bovenbouw belast" — coaching judgement [C], bewust simpeler in ruil voor minder invoer.
+    const shoulderLoadedToday = cl && (cl.workout_type === 'strength' || cl.workout_type === 'mixed') && (cl.rpe ?? 0) >= 7;
     const mildPainShoulder = logToday?.pain_level === 'mild' && (logToday.pain_location || '').toLowerCase().includes('schouder');
     if (mildPainShoulder && shoulderLoadedToday) {
       return {
         tier, component: 'Mobility',
-        reasoning: 'Milde schouderklacht + hoge overhead/pulling-load vandaag → alleen schouder-stability.',
+        reasoning: 'Milde schouderklacht + zware kracht/mixed-training vandaag → alleen schouder-stability.',
         notes: []
       };
     }
