@@ -773,3 +773,50 @@ update benchmark_definitions set target_tussenstap = 70 where name = 'Strict Pre
 update benchmark_definitions set target_tussenstap = 90 where name = 'Push Press';
 update benchmark_definitions set target_tussenstap = 102.5 where name = 'Push Jerk';
 update benchmark_definitions set target_tussenstap = 30 where name = 'Weighted Pull-up';
+
+-- ============ Migratie: Benchmark WODs (De Girls + bekende Hero WODs) ============
+-- `benchmark_definitions` wordt hergebruikt als reference-lijst voor zowel krachtlifts als
+-- named WODs (net als `skills` voor zowel skills als Strength/Mobility is hergebruikt). Alleen
+-- via schema.sql gevuld/uitgebreid, geen client-insert policy — zie localfiles/todo.md.
+alter table benchmark_definitions add column if not exists category text not null default 'strength'
+  check (category in ('strength','wod'));
+alter table benchmark_definitions add column if not exists workout_description text;
+alter table benchmark_definitions add column if not exists score_type text not null default 'load'
+  check (score_type in ('load','time','reps','rounds_reps'));
+
+-- Reconciliatie: index.html loggen al `notes` op benchmarks (fatigue-confirmed) zonder dat de
+-- kolom hier stond. `rx` is nieuw: of de gelogde score Rx of scaled was.
+alter table benchmarks add column if not exists notes text;
+alter table benchmarks add column if not exists rx boolean;
+
+-- Alfabetisch op naam (sort_order) — de Girls/Hero-indeling wordt nergens als aparte
+-- sectie getoond in de UI, dus a-z is hier gewoon de meest vindbare volgorde.
+insert into benchmark_definitions (name, category, workout_description, score_type, unit, sort_order) values
+  ('Angie', 'wod', '100 pull-ups, 100 push-ups, 100 sit-ups, 100 squats', 'time', 'tijd', 100),
+  ('Annie', 'wod', '50-40-30-20-10 double-unders en sit-ups', 'time', 'tijd', 101),
+  ('Barbara', 'wod', '5 ronden (3 min rust ertussen): 20 pull-ups, 30 push-ups, 40 sit-ups, 50 squats', 'time', 'tijd', 102),
+  ('Chelsea', 'wod', 'EMOM 30 min: 5 pull-ups, 10 push-ups, 15 squats', 'reps', 'reps', 103),
+  ('Cindy', 'wod', 'AMRAP 20 min: 5 pull-ups, 10 push-ups, 15 squats', 'rounds_reps', 'ronden+reps', 104),
+  ('Diane', 'wod', '21-15-9 deadlifts (102/70 kg) en HSPU', 'time', 'tijd', 105),
+  ('DT', 'wod', '5 ronden: 12 deadlifts, 9 hang power cleans, 6 push jerks (70/48 kg)', 'time', 'tijd', 106),
+  ('Elizabeth', 'wod', '21-15-9 cleans (61/43 kg) en ring dips', 'time', 'tijd', 107),
+  ('Eva', 'wod', '5 ronden: 800m run, 30 KB swings (32/24 kg), 30 pull-ups', 'time', 'tijd', 108),
+  ('Fran', 'wod', '21-15-9 thrusters (43/29 kg) en pull-ups', 'time', 'tijd', 109),
+  ('Grace', 'wod', '30 clean & jerks (61/43 kg)', 'time', 'tijd', 110),
+  ('Helen', 'wod', '3 ronden: 400m run, 21 KB swings (24/16 kg), 12 pull-ups', 'time', 'tijd', 111),
+  ('Isabel', 'wod', '30 snatches (61/43 kg)', 'time', 'tijd', 112),
+  ('Jackie', 'wod', '1000m row, 50 thrusters (20 kg), 30 pull-ups', 'time', 'tijd', 113),
+  ('JT', 'wod', '21-15-9 HSPU, ring dips, push-ups', 'time', 'tijd', 114),
+  ('Karen', 'wod', '150 wall balls (9/6 kg)', 'time', 'tijd', 115),
+  ('Kelly', 'wod', '5 ronden: 400m run, 30 box jumps, 30 wall balls', 'time', 'tijd', 116),
+  ('Linda', 'wod', '10-9-8...1: deadlift (1,5×BW), bench (BW), clean (0,75×BW)', 'time', 'tijd', 117),
+  ('Lynne', 'wod', '5 ronden max reps: bench press (BW), pull-ups', 'reps', 'reps', 118),
+  ('Mary', 'wod', 'AMRAP 20 min: 5 HSPU, 10 pistols, 15 pull-ups', 'rounds_reps', 'ronden+reps', 119),
+  ('Murph', 'wod', '1 mile run, 100 pull-ups, 200 push-ups, 300 squats, 1 mile run (met 9/6 kg vest)', 'time', 'tijd', 120),
+  ('Nancy', 'wod', '5 ronden: 400m run, 15 overhead squats (43/29 kg)', 'time', 'tijd', 121),
+  ('Nate', 'wod', 'AMRAP 20 min: 2 muscle-ups, 4 HSPU, 8 KB swings (32/24 kg)', 'rounds_reps', 'ronden+reps', 122),
+  ('Nicole', 'wod', 'AMRAP 20 min: 400m run + max pull-ups per ronde', 'rounds_reps', 'ronden+reps', 123),
+  ('Randy', 'wod', '75 power snatches (34/25 kg)', 'time', 'tijd', 124)
+on conflict (name) do update set
+  category = excluded.category, workout_description = excluded.workout_description,
+  score_type = excluded.score_type, unit = excluded.unit, sort_order = excluded.sort_order;
