@@ -843,3 +843,92 @@ create policy "owner_select" on custom_wods for select using (auth.uid() = user_
 create policy "owner_insert" on custom_wods for insert with check (auth.uid() = user_id);
 create policy "owner_update" on custom_wods for update using (auth.uid() = user_id);
 create policy "owner_delete" on custom_wods for delete using (auth.uid() = user_id);
+
+-- ============ Migratie: Leaderboard (vergelijken met andere gebruikers) ============
+-- `auth.users` is niet client-leesbaar, dus een aparte profiles-tabel geeft andere gebruikers
+-- een naam. Koppelt aan bestaande auth.users-id's (o.a. de 2 handmatig aangemaakte accounts),
+-- maakt zelf geen nieuwe gebruikers aan.
+create table if not exists profiles (
+  id uuid primary key references auth.users(id),
+  display_name text not null,
+  updated_at timestamptz not null default now()
+);
+alter table profiles enable row level security;
+drop policy if exists "profiles_read" on profiles;
+drop policy if exists "profiles_upsert_own" on profiles;
+drop policy if exists "profiles_update_own" on profiles;
+create policy "profiles_read" on profiles for select using (auth.role() = 'authenticated');
+create policy "profiles_upsert_own" on profiles for insert with check (auth.uid() = id);
+create policy "profiles_update_own" on profiles for update using (auth.uid() = id);
+
+-- Koppelt een gelogde score ondubbelzinnig aan een specifieke eigen WOD (i.p.v. alleen op `name`
+-- te matchen, wat niet meer betrouwbaar is zodra een WOD met iemand anders gedeeld wordt en
+-- meerdere mensen los van elkaar dezelfde naam kunnen gebruiken).
+alter table benchmarks add column if not exists custom_wod_id uuid references custom_wods(id) on delete set null;
+
+-- Wie een eigen WOD mag zien/scoren buiten de eigenaar zelf. Direct delen (geen accept-stap) —
+-- `seen_at` geeft de ontvanger een "nieuw"-indicator in de UI zonder een aparte invite-inbox.
+create table if not exists custom_wod_shares (
+  id uuid primary key default gen_random_uuid(),
+  wod_id uuid not null references custom_wods(id) on delete cascade,
+  shared_with_user_id uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
+  seen_at timestamptz,
+  unique (wod_id, shared_with_user_id)
+);
+alter table custom_wod_shares enable row level security;
+drop policy if exists "owner_select" on custom_wod_shares;
+drop policy if exists "owner_insert" on custom_wod_shares;
+drop policy if exists "owner_delete" on custom_wod_shares;
+drop policy if exists "invitee_select" on custom_wod_shares;
+drop policy if exists "invitee_mark_seen" on custom_wod_shares;
+create policy "owner_select" on custom_wod_shares for select using (
+  exists (select 1 from custom_wods cw where cw.id = wod_id and cw.user_id = auth.uid())
+);
+create policy "owner_insert" on custom_wod_shares for insert with check (
+  exists (select 1 from custom_wods cw where cw.id = wod_id and cw.user_id = auth.uid())
+);
+create policy "owner_delete" on custom_wod_shares for delete using (
+  exists (select 1 from custom_wods cw where cw.id = wod_id and cw.user_id = auth.uid())
+);
+create policy "invitee_select" on custom_wod_shares for select using (auth.uid() = shared_with_user_id);
+create policy "invitee_mark_seen" on custom_wod_shares for update using (auth.uid() = shared_with_user_id) with check (auth.uid() = shared_with_user_id);
+
+-- Extra leesrechten voor het leaderboard. Permissive policies worden OR'd met de bestaande
+-- owner-only select uit de unnest-loop, dus die blijft intact voor insert/update/delete.
+-- Skill-niveaus zijn net zo min privacygevoelig als skills/benchmark_definitions: volledig open.
+drop policy if exists "leaderboard_select" on skill_progressions;
+create policy "leaderboard_select" on skill_progressions for select using (auth.role() = 'authenticated');
+
+-- Standaard benchmark/kracht-scores (naam bestaat in benchmark_definitions) zijn open voor
+-- iedereen; scores voor een eigen WOD alleen voor wie 'm deelt of gedeeld kreeg.
+drop policy if exists "leaderboard_select" on benchmarks;
+create policy "leaderboard_select" on benchmarks for select using (
+  exists (select 1 from benchmark_definitions bd where bd.name = benchmarks.name)
+  or exists (select 1 from custom_wod_shares s where s.wod_id = benchmarks.custom_wod_id and s.shared_with_user_id = auth.uid())
+  or exists (select 1 from custom_wods cw where cw.id = benchmarks.custom_wod_id and cw.user_id = auth.uid())
+);
+
+-- De eigen-WOD-definitie zelf (naam/omschrijving/score_type) zichtbaar voor wie hij gedeeld is.
+drop policy if exists "shared_select" on custom_wods;
+create policy "shared_select" on custom_wods for select using (
+  exists (select 1 from custom_wod_shares s where s.wod_id = custom_wods.id and s.shared_with_user_id = auth.uid())
+);
+
+-- ============ Fix: RLS-recursie tussen custom_wods en custom_wod_shares ============
+-- custom_wods.shared_select query't custom_wod_shares, en custom_wod_shares.owner_select query't op
+-- zijn beurt weer custom_wods — dat is een circulaire verwijzing die Postgres in een oneindige lus
+-- laat lopen (500 Internal Server Error op elke query tegen custom_wods, en via benchmarks.leaderboard_select
+-- ook op benchmarks). Fix: de eigenaarscheck loopt via een security definer-functie, die als functie-eigenaar
+-- (bypassed RLS) draait i.p.v. als de inloggende gebruiker, en dus custom_wods' RLS niet opnieuw triggert.
+create or replace function is_custom_wod_owner(wod uuid) returns boolean
+language sql security definer stable set search_path = public as $$
+  select exists (select 1 from custom_wods where id = wod and user_id = auth.uid());
+$$;
+
+drop policy if exists "owner_select" on custom_wod_shares;
+drop policy if exists "owner_insert" on custom_wod_shares;
+drop policy if exists "owner_delete" on custom_wod_shares;
+create policy "owner_select" on custom_wod_shares for select using (is_custom_wod_owner(wod_id));
+create policy "owner_insert" on custom_wod_shares for insert with check (is_custom_wod_owner(wod_id));
+create policy "owner_delete" on custom_wod_shares for delete using (is_custom_wod_owner(wod_id));

@@ -41,9 +41,10 @@
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
   nav{flex:0 0 auto;display:flex;gap:2px;margin:0 12px calc(10px + env(safe-area-inset-bottom));padding:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 10px 24px oklch(0.4 0.06 60 / 0.10)}
-  nav button{flex:1;background:transparent;border:none;color:var(--muted);font-size:11px;font-weight:600;margin:0;padding:8px 2px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  nav button{position:relative;flex:1;background:transparent;border:none;color:var(--muted);font-size:11px;font-weight:600;margin:0;padding:8px 2px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px}
   nav button svg{width:19px;height:19px}
   nav button.active{background:var(--accent);color:var(--accent-ink)}
+  .navdot{position:absolute;top:6px;right:16px;width:8px;height:8px;border-radius:999px;background:var(--danger)}
   .hidden{display:none}
   .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .tag{background:oklch(from var(--accent) l c h / 0.12);border:none;border-radius:999px;padding:4px 10px;font-size:12px;color:var(--accent);font-weight:600}
@@ -80,7 +81,10 @@
 <div id="app" class="container hidden">
 
   <section id="tab-today" class="tabpane">
-    <h2>Today</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Today</h2>
+      <button type="button" id="goToLogBtn" class="secondary small" style="width:auto;flex:none;margin:0">Log</button>
+    </div>
 
     <div class="card">
       <h3>Voor de class</h3>
@@ -211,7 +215,10 @@
   </section>
 
   <section id="tab-log" class="tabpane hidden">
-    <h2>Training log</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Training log</h2>
+      <button type="button" id="backToTodayBtn" class="secondary small" style="width:auto;flex:none;margin:0">Today</button>
+    </div>
     <div class="card">
       <table>
         <thead><tr><th>Datum</th><th>Type</th><th>Detail</th><th></th></tr></thead>
@@ -256,13 +263,47 @@
     <div id="blockView">Laden...</div>
   </section>
 
+  <section id="tab-leaderboard" class="tabpane hidden">
+    <h2>Leaderboard</h2>
+    <div class="card">
+      <div id="lbProfile">Laden...</div>
+    </div>
+    <div class="card">
+      <details style="margin-top:0">
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Kracht</summary>
+        <div class="detail-body"><div id="lbStrength">Laden...</div></div>
+      </details>
+    </div>
+    <div class="card">
+      <details style="margin-top:0">
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Benchmark WODs</summary>
+        <div class="detail-body"><div id="lbWods">Laden...</div></div>
+      </details>
+    </div>
+    <div class="card">
+      <details style="margin-top:0">
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Skills</summary>
+        <div class="detail-body"><div id="lbSkills">Laden...</div></div>
+      </details>
+    </div>
+    <div class="card">
+      <details style="margin-top:0" open>
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Eigen WOD's</summary>
+        <div class="detail-body">
+          <p style="font-size:13px;margin-top:-4px">WOD's die jij deelt, en WOD's die met jou gedeeld zijn.</p>
+          <div id="lbCustomWods">Laden...</div>
+        </div>
+      </details>
+    </div>
+  </section>
+
   <button id="logoutBtn" class="secondary" style="max-width:720px;margin:20px auto;display:block">Uitloggen</button>
 </div>
 
 <nav id="navbar" class="hidden">
   <button data-tab="today" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M9 12l2 2 4-4"></path></svg>Today</button>
   <button data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V13"></path><path d="M12 19V7"></path><path d="M19 19V10"></path></svg>Dashboard</button>
-  <button data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h9"></path></svg>Log</button>
+  <button data-tab="leaderboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"></path><path d="M7 6H4a2 2 0 0 0 2 4"></path><path d="M17 6h3a2 2 0 0 1-2 4"></path><path d="M12 14v4"></path><path d="M8 21h8"></path></svg>Leaderboard<span id="lbNavDot" class="navdot hidden"></span></button>
   <button data-tab="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5 5.6.6-4.2 3.7 1.2 5.5-4.8-3-4.8 3 1.2-5.5-4.2-3.7 5.6-.6z"></path></svg>Skills</button>
   <button data-tab="block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l8 4-8 4-8-4 8-4z"></path><path d="M4 13l8 4 8-4"></path></svg>Block</button>
 </nav>
@@ -458,6 +499,11 @@ function frozenSkillNames() {
 }
 let benchmarkDefsCache = [];
 let customWodsCache = []; // eigen WOD's van deze gebruiker, apart van de gedeelde benchmark_definitions-lijst
+let profilesCache = {}; // user_id -> display_name, van alle gebruikers (voor het leaderboard)
+let unseenShareCount = 0;
+function updateLbNavDot() {
+  document.getElementById('lbNavDot').classList.toggle('hidden', unseenShareCount === 0);
+}
 
 // ---------- Auth ----------
 async function init() {
@@ -490,6 +536,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   if (error) errEl.textContent = error.message;
 });
 document.getElementById('logoutBtn').addEventListener('click', () => sb.auth.signOut());
+document.getElementById('goToLogBtn').addEventListener('click', () => switchTab('log'));
+document.getElementById('backToTodayBtn').addEventListener('click', () => switchTab('today'));
 
 // ---------- Nav ----------
 document.getElementById('navbar').addEventListener('click', (e) => {
@@ -506,6 +554,7 @@ function switchTab(tab) {
   if (tab === 'log') renderLog();
   if (tab === 'skills') renderSkills();
   if (tab === 'block') renderBlock();
+  if (tab === 'leaderboard') renderLeaderboard();
 }
 
 function val(id) { return document.getElementById(id).value || null; }
@@ -872,23 +921,26 @@ async function renderDashboard() {
     : `<p style="font-size:13px;color:var(--muted)">Nog geen eigen WOD's toegevoegd.</p>`;
 }
 
-function wodRowHtml(b, benchmarks, isCustom) {
+function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
+  const { deletable = isCustom, ownerLabel = null, isNew = false, shareId = null, rankHtml = '' } = extra;
   const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
   const latest = history[0];
   const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
+  // Geen "Nog niet gelogd."-tekst hier als er geen historie is — dat staat al in de badge hierboven.
   const historyHtml = history.length
     ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
-    : `<p style="font-size:13px;color:var(--muted);margin-top:6px">Nog niet gelogd.</p>`;
+    : '';
   return `
-    <div class="benchmarkRow" data-name="${b.name}" style="margin:12px 0;cursor:pointer">
+    <div class="benchmarkRow" data-name="${b.name}" data-wod-id="${b.id}" data-custom="${isCustom ? '1' : '0'}"${shareId ? ` data-share-id="${shareId}"` : ''} style="margin:12px 0;cursor:pointer">
       <div class="row" style="justify-content:space-between">
-        <strong>${b.name}</strong>
+        <strong>${b.name}${isNew ? ' <span class="badge warn">Nieuw</span>' : ''}</strong>
         <span class="badge ${latest ? 'ok' : ''}">${latest ? `${latest.value}${rxLabel(latest)}` : 'nog niet gelogd'}</span>
       </div>
+      ${ownerLabel ? `<p style="font-size:12px;color:var(--muted);margin:2px 0 0">gedeeld door ${ownerLabel}</p>` : ''}
       <p style="font-size:13px;margin:4px 0 0">${b.workout_description || ''}</p>
-      ${historyHtml}
+      ${rankHtml || historyHtml}
       ${wodInlineFormHtml(b.score_type)}
-      ${isCustom ? `<button type="button" class="secondary small deleteCustomWodBtn" data-id="${b.id}" style="margin-top:8px">Verwijder eigen WOD</button>` : ''}
+      ${deletable ? `<button type="button" class="secondary small deleteCustomWodBtn" data-id="${b.id}" style="margin-top:8px">Verwijder eigen WOD</button>` : ''}
     </div>`;
 }
 
@@ -930,24 +982,56 @@ document.addEventListener('click', async (e) => {
   if (wodSaveBtn) {
     const row = wodSaveBtn.closest('.benchmarkRow');
     const name = row.dataset.name;
+    const onLeaderboard = !!row.closest('#tab-leaderboard');
+    const custom_wod_id = row.dataset.custom === '1' ? row.dataset.wodId : null;
     const form = wodSaveBtn.closest('.wodInlineForm');
     const value = form.querySelector('.wodInlineInput').value.trim();
     if (!value) { alert('Vul een score in.'); return; }
     const rxSelected = form.querySelector('.wodRxChip.active');
     const rx = rxSelected ? rxSelected.dataset.value === 'true' : null;
     const { data: { user } } = await sb.auth.getUser();
-    const { error } = await sb.from('benchmarks').insert({ user_id: user.id, name, value, date: localDateStr(), rx });
+    const { error } = await sb.from('benchmarks').insert({ user_id: user.id, name, value, date: localDateStr(), rx, custom_wod_id });
     if (error) { alert(error.message); return; }
-    renderDashboard();
+    if (onLeaderboard) renderLeaderboard(); else renderDashboard();
     return;
   }
 
   const deleteCwBtn = e.target.closest('.deleteCustomWodBtn');
   if (deleteCwBtn) {
     if (!confirm('Deze eigen WOD verwijderen? Eerder gelogde scores blijven staan in de Log-tab.')) return;
+    const onLeaderboard = !!deleteCwBtn.closest('#tab-leaderboard');
     await sb.from('custom_wods').delete().eq('id', deleteCwBtn.dataset.id);
     customWodsCache = customWodsCache.filter(w => w.id !== deleteCwBtn.dataset.id);
-    renderDashboard();
+    if (onLeaderboard) renderLeaderboard(); else renderDashboard();
+    return;
+  }
+
+  const lbSaveNameBtn = e.target.closest('#lbSaveNameBtn');
+  if (lbSaveNameBtn) {
+    const name = document.getElementById('lb_display_name').value.trim();
+    if (!name) { alert('Vul een naam in.'); return; }
+    const { data: { user } } = await sb.auth.getUser();
+    const { error } = await sb.from('profiles').upsert({ id: user.id, display_name: name, updated_at: new Date().toISOString() });
+    if (error) { alert(error.message); return; }
+    profilesCache[user.id] = name;
+    renderLeaderboard();
+    return;
+  }
+
+  const addShareBtn = e.target.closest('.addShareBtn');
+  if (addShareBtn) {
+    const select = addShareBtn.parentElement.querySelector('.shareUserSelect');
+    if (!select || !select.value) return;
+    const { error } = await sb.from('custom_wod_shares').insert({ wod_id: addShareBtn.dataset.wodId, shared_with_user_id: select.value });
+    if (error) { alert(error.message); return; }
+    renderLeaderboard();
+    return;
+  }
+
+  const removeShareBtn = e.target.closest('.removeShareBtn');
+  if (removeShareBtn) {
+    await sb.from('custom_wod_shares').delete().eq('id', removeShareBtn.dataset.shareId);
+    renderLeaderboard();
     return;
   }
 
@@ -956,8 +1040,142 @@ document.addEventListener('click', async (e) => {
   if (bmRow) {
     const form = bmRow.querySelector('.bmInlineForm') || bmRow.querySelector('.wodInlineForm');
     if (form) form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+    if (bmRow.dataset.shareId && bmRow.querySelector('.badge.warn')) {
+      const shareId = bmRow.dataset.shareId;
+      bmRow.querySelectorAll('.badge.warn').forEach(el => el.remove());
+      unseenShareCount = Math.max(0, unseenShareCount - 1);
+      updateLbNavDot();
+      await sb.from('custom_wod_shares').update({ seen_at: new Date().toISOString() }).eq('id', shareId);
+    }
   }
 });
+
+// ---------- Leaderboard ----------
+// benchmarks.value is vrije tekst (mm:ss, "12+4", of een getal) — per score_type naar een
+// vergelijkbare numerieke sleutel omzetten. Onparsbare rijen vallen uit de ranglijst i.p.v.
+// de sortering te laten crashen.
+function parseScoreValue(value, scoreType) {
+  if (value == null) return null;
+  const v = String(value).trim();
+  if (scoreType === 'load' || scoreType === 'reps') {
+    const n = Number(v.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+  if (scoreType === 'time') {
+    const parts = v.split(':').map(p => Number(p));
+    if (!parts.length || parts.some(p => !Number.isFinite(p))) return null;
+    return parts.reduce((acc, p) => acc * 60 + p, 0);
+  }
+  if (scoreType === 'rounds_reps') {
+    const m = v.match(/^(\d+)\s*\+\s*(\d+)/);
+    if (!m) return null;
+    return Number(m[1]) + Number(m[2]) / 1000;
+  }
+  return null;
+}
+function rankEntries(entries, scoreType) {
+  const lowerIsBetter = scoreType === 'time';
+  return entries
+    .map(e => ({ ...e, key: parseScoreValue(e.value, scoreType) }))
+    .filter(e => e.key != null)
+    .sort((a, b) => lowerIsBetter ? a.key - b.key : b.key - a.key);
+}
+function rankListHtml(ranked, currentUserId) {
+  if (!ranked.length) return `<p style="font-size:13px;color:var(--muted);margin-top:4px">Nog geen scores gelogd.</p>`;
+  return `<ol style="margin:6px 0 0 18px;padding:0;font-size:13px">${ranked.map(e => `
+    <li style="${e.userId === currentUserId ? 'font-weight:700' : ''}">${profilesCache[e.userId] || 'Onbekende gebruiker'}${e.userId === currentUserId ? ' (jij)' : ''} — ${e.value}</li>`).join('')}</ol>`;
+}
+// Per naam/skill de meest recente rij per gebruiker (laatste datum, daarna laatste created_at).
+function latestPerUser(rows) {
+  const byUser = {};
+  (rows || []).forEach(r => {
+    const existing = byUser[r.user_id];
+    if (!existing || r.date > existing.date || (r.date === existing.date && r.created_at > existing.created_at)) {
+      byUser[r.user_id] = r;
+    }
+  });
+  return Object.values(byUser);
+}
+
+async function renderLeaderboard() {
+  const { data: { user } } = await sb.auth.getUser();
+
+  const profileEl = document.getElementById('lbProfile');
+  profileEl.innerHTML = `
+    <label>Jouw naam op het leaderboard</label>
+    <input id="lb_display_name" type="text" value="${profilesCache[user.id] || ''}" placeholder="bv. Bas" />
+    <button type="button" id="lbSaveNameBtn" class="secondary">Opslaan</button>`;
+
+  // RLS filtert dit al correct: eigen rijen + standaard benchmark/kracht-rijen van iedereen +
+  // eigen-WOD-scores voor WOD's die je deelt of die met jou gedeeld zijn.
+  const { data: benchmarks } = await sb.from('benchmarks').select('*');
+
+  const buildDefsList = (category) => benchmarkDefsCache.filter(b => b.category === category).map(b => {
+    const entries = latestPerUser((benchmarks || []).filter(x => x.name === b.name)).map(r => ({ userId: r.user_id, value: r.value }));
+    const ranked = rankEntries(entries, b.score_type);
+    return `<div style="margin:12px 0"><strong>${b.name}</strong>${rankListHtml(ranked, user.id)}</div>`;
+  }).join('');
+  document.getElementById('lbStrength').innerHTML = buildDefsList('strength') || `<p style="font-size:13px;color:var(--muted)">Geen kracht-benchmarks.</p>`;
+  document.getElementById('lbWods').innerHTML = buildDefsList('wod') || `<p style="font-size:13px;color:var(--muted)">Geen benchmark WODs.</p>`;
+
+  const { data: allProgressions } = await sb.from('skill_progressions').select('*');
+  document.getElementById('lbSkills').innerHTML = skillsCache.map(s => {
+    const ranked = (allProgressions || [])
+      .filter(p => p.skill_id === s.id)
+      .map(p => ({ userId: p.user_id, level: p.current_level_number ?? 0 }))
+      .sort((a, b) => b.level - a.level);
+    const listHtml = ranked.length
+      ? `<ol style="margin:6px 0 0 18px;padding:0;font-size:13px">${ranked.map(e => `
+          <li style="${e.userId === user.id ? 'font-weight:700' : ''}">${profilesCache[e.userId] || 'Onbekende gebruiker'}${e.userId === user.id ? ' (jij)' : ''} — niveau ${e.level + 1}</li>`).join('')}</ol>`
+      : `<p style="font-size:13px;color:var(--muted);margin-top:4px">Nog geen voortgang gelogd.</p>`;
+    return `<div style="margin:12px 0"><strong>${s.name}</strong>${listHtml}</div>`;
+  }).join('');
+
+  await renderCustomWodLeaderboard(user, benchmarks);
+}
+
+async function renderCustomWodLeaderboard(user, benchmarks) {
+  const el = document.getElementById('lbCustomWods');
+  // wodRowHtml's "laatste"-badge/geschiedenis hoort alleen jouw eigen scores te tonen (net als op
+  // Dashboard, waar de query al user-gescoped is) — de ranglijst zelf gebruikt wel alle gebruikers.
+  const myBenchmarks = (benchmarks || []).filter(b => b.user_id === user.id);
+
+  const myWodIds = customWodsCache.map(w => w.id);
+  const { data: sharesOfMine } = myWodIds.length
+    ? await sb.from('custom_wod_shares').select('*').in('wod_id', myWodIds)
+    : { data: [] };
+  const { data: sharedWithMe } = await sb.from('custom_wod_shares').select('*, custom_wods(*)').eq('shared_with_user_id', user.id);
+
+  const ownHtml = customWodsCache.length ? customWodsCache.map(w => {
+    const shares = (sharesOfMine || []).filter(s => s.wod_id === w.id);
+    const otherUserIds = Object.keys(profilesCache).filter(id => id !== user.id && !shares.some(s => s.shared_with_user_id === id));
+    const entries = latestPerUser((benchmarks || []).filter(b => b.custom_wod_id === w.id)).map(r => ({ userId: r.user_id, value: r.value }));
+    const ranked = rankEntries(entries, w.score_type);
+    const row = wodRowHtml(w, myBenchmarks, true, { rankHtml: rankListHtml(ranked, user.id) });
+    const shareMgmt = `<div style="margin:-8px 0 16px">
+      <p style="font-size:13px;margin:4px 0">Gedeeld met: ${shares.length ? shares.map(s => profilesCache[s.shared_with_user_id] || 'Onbekend').join(', ') : 'niemand'}</p>
+      ${shares.map(s => `<button type="button" class="secondary small removeShareBtn" data-share-id="${s.id}" style="margin:2px 4px 2px 0">${profilesCache[s.shared_with_user_id] || 'Onbekend'} verwijderen</button>`).join('')}
+      ${otherUserIds.length ? `
+      <div class="row" style="margin-top:8px">
+        <select class="shareUserSelect">${otherUserIds.map(id => `<option value="${id}">${profilesCache[id]}</option>`).join('')}</select>
+        <button type="button" class="secondary small addShareBtn" data-wod-id="${w.id}" style="flex:none">Deel</button>
+      </div>` : ''}
+    </div>`;
+    return row + shareMgmt;
+  }).join('') : `<p style="font-size:13px;color:var(--muted)">Je hebt nog geen eigen WOD's (voeg toe via Dashboard).</p>`;
+
+  const validShares = (sharedWithMe || []).filter(s => s.custom_wods);
+  const sharedHtml = validShares.length ? validShares.map(s => {
+    const wod = s.custom_wods;
+    const entries = latestPerUser((benchmarks || []).filter(b => b.custom_wod_id === wod.id)).map(r => ({ userId: r.user_id, value: r.value }));
+    const ranked = rankEntries(entries, wod.score_type);
+    return wodRowHtml(wod, myBenchmarks, true, {
+      deletable: false, ownerLabel: profilesCache[wod.user_id], isNew: !s.seen_at, shareId: s.id, rankHtml: rankListHtml(ranked, user.id)
+    });
+  }).join('') : `<p style="font-size:13px;color:var(--muted)">Nog niemand heeft een WOD met jou gedeeld.</p>`;
+
+  el.innerHTML = `<h4 style="margin:14px 0 4px">Jouw eigen WOD's</h4>${ownHtml}<h4 style="margin:18px 0 4px">Met jou gedeeld</h4>${sharedHtml}`;
+}
 
 // ---------- Log ----------
 async function renderLog() {
@@ -1008,6 +1226,13 @@ async function loadSkills() {
   benchmarkDefsCache = benchmarkDefsData || [];
   const { data: customWodsData } = await sb.from('custom_wods').select('*').eq('user_id', user.id).order('name');
   customWodsCache = customWodsData || [];
+  const { data: profilesData } = await sb.from('profiles').select('*');
+  profilesCache = {};
+  (profilesData || []).forEach(p => { profilesCache[p.id] = p.display_name; });
+  const { count: unseenCount } = await sb.from('custom_wod_shares').select('id', { count: 'exact', head: true })
+    .eq('shared_with_user_id', user.id).is('seen_at', null);
+  unseenShareCount = unseenCount || 0;
+  updateLbNavDot();
   const { data: progressions } = await sb.from('skill_progressions').select('*').eq('user_id', user.id);
   progressionsCache = {};
   frozenCache = {};
