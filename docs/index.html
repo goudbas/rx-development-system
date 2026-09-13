@@ -54,6 +54,18 @@
   .chip{width:auto;flex:none;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;margin:0}
   .chip.active{background:var(--accent2);border-color:var(--accent2);color:var(--accent-ink)}
   .chip-group.scale .chip{padding:10px 14px;min-width:44px;text-align:center}
+  .segmented{display:flex;gap:2px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 10px 24px oklch(0.4 0.06 60 / 0.10)}
+  .segmented button{flex:1;background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:600;margin:0;padding:10px 4px;border-radius:14px}
+  .segmented button.active{background:var(--accent);color:var(--accent-ink)}
+  .wodMeta{display:inline-flex;align-items:center;gap:6px}
+  .wodIcon{font-size:14px}
+  .trend-up{color:var(--accent);font-size:12px;margin-left:4px}
+  .trend-down{color:var(--danger);font-size:12px;margin-left:4px}
+  .rankList{margin-top:6px;font-size:13px}
+  .rankRow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 8px;border-radius:10px}
+  .rankRow.me{background:oklch(from var(--accent) l c h / 0.12);font-weight:700}
+  .rankRow .rankName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rankRow .rankScore{font-weight:600;flex:none}
   details{margin-top:16px}
   details summary{cursor:pointer;color:var(--accent2);font-weight:600;padding:6px 0;list-style:none}
   details summary::-webkit-details-marker{display:none}
@@ -180,7 +192,7 @@
     </div>
     <div class="card">
       <details style="margin-top:0">
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Benchmark WODs</summary>
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Benchmarks</summary>
         <div class="detail-body">
           <p style="font-size:13px;margin-top:-4px">Tik op een WOD om een score te loggen.</p>
           <div id="wodList">Laden...</div>
@@ -189,12 +201,12 @@
     </div>
     <div class="card">
       <details style="margin-top:0">
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Eigen WOD's</summary>
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Custom WODs</summary>
         <div class="detail-body">
-          <p style="font-size:13px;margin-top:-4px">Je eigen WOD's, los van de vaste lijst hierboven.</p>
+          <p style="font-size:13px;margin-top:-4px">Je eigen custom WODs, los van de vaste lijst hierboven.</p>
           <div id="customWodList">Laden...</div>
           <details style="margin-top:10px">
-            <summary style="font-size:13px">+ Eigen WOD toevoegen</summary>
+            <summary style="font-size:13px">+ Custom WOD toevoegen</summary>
             <div class="detail-body">
               <label>Naam</label>
               <input id="cw_name" type="text" placeholder="bv. Box WOD 3" />
@@ -268,32 +280,30 @@
     <div class="card">
       <div id="lbProfile">Laden...</div>
     </div>
-    <div class="card">
-      <details style="margin-top:0">
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Kracht</summary>
-        <div class="detail-body"><div id="lbStrength">Laden...</div></div>
-      </details>
+
+    <div class="segmented" id="lbCategoryChips" style="margin:4px 0 14px">
+      <button type="button" class="active" data-cat="strength">Kracht</button>
+      <button type="button" data-cat="wods">Benchmarks</button>
+      <button type="button" data-cat="skills">Skills</button>
+      <button type="button" data-cat="custom">Custom WODs</button>
     </div>
-    <div class="card">
-      <details style="margin-top:0">
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Benchmark WODs</summary>
-        <div class="detail-body"><div id="lbWods">Laden...</div></div>
-      </details>
+
+    <div class="card" id="lbCat-strength">
+      <h3>Kracht</h3>
+      <div id="lbStrength">Laden...</div>
     </div>
-    <div class="card">
-      <details style="margin-top:0">
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Skills</summary>
-        <div class="detail-body"><div id="lbSkills">Laden...</div></div>
-      </details>
+    <div class="card hidden" id="lbCat-wods">
+      <h3>Benchmarks</h3>
+      <div id="lbWods">Laden...</div>
     </div>
-    <div class="card">
-      <details style="margin-top:0" open>
-        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Eigen WOD's</summary>
-        <div class="detail-body">
-          <p style="font-size:13px;margin-top:-4px">WOD's die jij deelt, en WOD's die met jou gedeeld zijn.</p>
-          <div id="lbCustomWods">Laden...</div>
-        </div>
-      </details>
+    <div class="card hidden" id="lbCat-skills">
+      <h3>Skills</h3>
+      <div id="lbSkills">Laden...</div>
+    </div>
+    <div class="card hidden" id="lbCat-custom">
+      <h3>Custom WODs</h3>
+      <p style="font-size:13px;margin-top:-4px">Custom WODs die jij deelt, en die met jou gedeeld zijn.</p>
+      <div id="lbCustomWods">Laden...</div>
     </div>
   </section>
 
@@ -816,12 +826,28 @@ function bmInlineFormHtml() {
 }
 
 // Score-invoer is per WOD anders (tijd/reps/ronden+reps/load), vandaar een los formulier i.p.v.
-// hergebruik van bmInlineFormHtml — die gaat uit van één numerieke waarde.
+// hergebruik van bmInlineFormHtml — die gaat uit van één numerieke waarde. Tijd en ronden+reps zijn
+// vrij-tekstvelden geweest (mm:ss / "12+4"), maar dat liet bv. 90 seconden of rommelige notatie toe —
+// losse genummerde velden per onderdeel dwingen een geldig formaat af (seconden 0-59 e.d.).
 function wodInlineFormHtml(scoreType) {
-  const placeholder = scoreType === 'time' ? 'mm:ss' : scoreType === 'rounds_reps' ? 'bv. 12+4' : 'aantal';
-  const numeric = scoreType === 'load' || scoreType === 'reps';
+  let fieldsHtml;
+  if (scoreType === 'time') {
+    fieldsHtml = `<div class="row" style="align-items:center;gap:6px">
+      <input type="number" min="0" step="1" inputmode="numeric" class="wodInlineInput wodTimeMin" placeholder="mm" style="padding:14px;font-size:17px" />
+      <span style="flex:none;color:var(--muted);font-weight:700">:</span>
+      <input type="number" min="0" max="59" step="1" inputmode="numeric" class="wodInlineInput wodTimeSec" placeholder="ss" style="padding:14px;font-size:17px" />
+    </div>`;
+  } else if (scoreType === 'rounds_reps') {
+    fieldsHtml = `<div class="row" style="align-items:center;gap:6px">
+      <input type="number" min="0" step="1" inputmode="numeric" class="wodInlineInput wodRounds" placeholder="ronden" style="padding:14px;font-size:17px" />
+      <span style="flex:none;color:var(--muted);font-weight:700">+</span>
+      <input type="number" min="0" step="1" inputmode="numeric" class="wodInlineInput wodExtraReps" placeholder="reps" style="padding:14px;font-size:17px" />
+    </div>`;
+  } else {
+    fieldsHtml = `<input type="number" step="0.1" class="wodInlineInput" placeholder="aantal" style="padding:14px;font-size:17px" />`;
+  }
   return `<div class="wodInlineForm" style="margin-top:8px;gap:8px;display:none;flex-direction:column">
-    <input type="${numeric ? 'number' : 'text'}" ${numeric ? 'step="0.1"' : ''} class="wodInlineInput" placeholder="${placeholder}" style="padding:14px;font-size:17px" />
+    ${fieldsHtml}
     <div class="chip-group">
       <button type="button" class="chip wodRxChip" data-value="true">Rx</button>
       <button type="button" class="chip wodRxChip" data-value="false">Scaled</button>
@@ -918,7 +944,22 @@ async function renderDashboard() {
   const customWodEl = document.getElementById('customWodList');
   customWodEl.innerHTML = customWodsCache.length
     ? customWodsCache.map(b => wodRowHtml(b, benchmarks, true)).join('')
-    : `<p style="font-size:13px;color:var(--muted)">Nog geen eigen WOD's toegevoegd.</p>`;
+    : `<p style="font-size:13px;color:var(--muted)">Nog geen custom WODs toegevoegd.</p>`;
+}
+
+function scoreTypeIcon(scoreType) {
+  return scoreType === 'time' ? '⏱' : scoreType === 'rounds_reps' ? '🔁' : '🔢';
+}
+
+// Vergelijkt de laatste met de één-na-laatste poging (zelfde "lager is beter bij tijd, anders hoger
+// is beter"-regel als rankEntries) en geeft een groene/rode pijl terug, of niks bij <2 pogingen.
+function trendArrowHtml(history, scoreType) {
+  if (!history || history.length < 2) return '';
+  const cur = parseScoreValue(history[0].value, scoreType);
+  const prev = parseScoreValue(history[1].value, scoreType);
+  if (cur == null || prev == null || cur === prev) return '';
+  const improved = scoreType === 'time' ? cur < prev : cur > prev;
+  return `<span class="${improved ? 'trend-up' : 'trend-down'}">${improved ? '▲' : '▼'}</span>`;
 }
 
 function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
@@ -926,9 +967,11 @@ function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
   const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
   const latest = history[0];
   const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
-  // Geen "Nog niet gelogd."-tekst hier als er geen historie is — dat staat al in de badge hierboven.
-  const historyHtml = history.length
-    ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
+  // Compacte "vorige: x, y"-regel i.p.v. een bullet-lijst — alleen relevant in de platte lijstweergave
+  // (Dashboard); waar rankHtml is meegegeven (Leaderboard) wordt dit gedeelte niet gebruikt.
+  const prevHistory = history.slice(1);
+  const historyHtml = prevHistory.length
+    ? `<p style="font-size:12px;color:var(--muted);margin:4px 0 0">vorige: ${prevHistory.map(h => `${h.value}${rxLabel(h)}`).join(', ')}</p>`
     : '';
   // Acties: eigen laatst gelogde score verwijderen (ook op gedeelde/andermans WOD's — het is altijd
   // jouw eigen rij, `benchmarks` hier is al user-gescoped), eigen WOD-definitie verwijderen (alleen
@@ -940,9 +983,9 @@ function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
   ].filter(Boolean).join('');
   return `
     <div class="benchmarkRow" data-name="${b.name}" data-wod-id="${b.id}" data-custom="${isCustom ? '1' : '0'}"${shareId ? ` data-share-id="${shareId}"` : ''} style="margin:12px 0;cursor:pointer">
-      <div class="row" style="justify-content:space-between">
-        <strong>${b.name}${isNew ? ' <span class="badge warn">Nieuw</span>' : ''}</strong>
-        <span class="badge ${latest ? 'ok' : ''}">${latest ? `${latest.value}${rxLabel(latest)}` : 'nog niet gelogd'}</span>
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <strong class="wodMeta"><span class="wodIcon">${scoreTypeIcon(b.score_type)}</span>${b.name}${isNew ? ' <span class="badge warn">Nieuw</span>' : ''}</strong>
+        <span class="badge ${latest ? 'ok' : ''}">${latest ? `${latest.value}${rxLabel(latest)}${trendArrowHtml(history, b.score_type)}` : 'nog niet gelogd'}</span>
       </div>
       ${ownerLabel ? `<p style="font-size:12px;color:var(--muted);margin:2px 0 0">gedeeld door ${ownerLabel}</p>` : ''}
       <p style="font-size:13px;margin:4px 0 0">${b.workout_description || ''}</p>
@@ -993,8 +1036,27 @@ document.addEventListener('click', async (e) => {
     const onLeaderboard = !!row.closest('#tab-leaderboard');
     const custom_wod_id = row.dataset.custom === '1' ? row.dataset.wodId : null;
     const form = wodSaveBtn.closest('.wodInlineForm');
-    const value = form.querySelector('.wodInlineInput').value.trim();
-    if (!value) { alert('Vul een score in.'); return; }
+
+    // Tijd en ronden+reps komen uit losse genummerde velden (zie wodInlineFormHtml) en worden hier
+    // samengevoegd tot dezelfde "mm:ss"/"ronden+reps"-tekst die parseScoreValue elders al verwacht.
+    const timeMin = form.querySelector('.wodTimeMin');
+    const timeSec = form.querySelector('.wodTimeSec');
+    const roundsInput = form.querySelector('.wodRounds');
+    const repsInput = form.querySelector('.wodExtraReps');
+    let value;
+    if (timeMin && timeSec) {
+      const min = Number(timeMin.value), sec = Number(timeSec.value);
+      if (timeMin.value === '' || timeSec.value === '' || !Number.isFinite(min) || !Number.isFinite(sec) || min < 0 || sec < 0) { alert('Vul minuten en seconden in.'); return; }
+      if (sec > 59) { alert('Seconden kan niet hoger zijn dan 59.'); return; }
+      value = `${min}:${String(sec).padStart(2, '0')}`;
+    } else if (roundsInput && repsInput) {
+      const rounds = Number(roundsInput.value), reps = Number(repsInput.value);
+      if (roundsInput.value === '' || repsInput.value === '' || !Number.isFinite(rounds) || !Number.isFinite(reps) || rounds < 0 || reps < 0) { alert('Vul ronden en reps in.'); return; }
+      value = `${rounds}+${reps}`;
+    } else {
+      value = form.querySelector('.wodInlineInput').value.trim();
+      if (!value) { alert('Vul een score in.'); return; }
+    }
     const rxSelected = form.querySelector('.wodRxChip.active');
     const rx = rxSelected ? rxSelected.dataset.value === 'true' : null;
     const { data: { user } } = await sb.auth.getUser();
@@ -1022,6 +1084,12 @@ document.addEventListener('click', async (e) => {
     const { error } = await sb.from('benchmarks').delete().eq('id', deleteWodScoreBtn.dataset.benchmarkId);
     if (error) { alert(error.message); return; }
     if (onLeaderboard) renderLeaderboard(); else renderDashboard();
+    return;
+  }
+
+  const lbEditNameBtn = e.target.closest('#lbEditNameBtn');
+  if (lbEditNameBtn) {
+    document.getElementById('lbNameForm').classList.toggle('hidden');
     return;
   }
 
@@ -1073,6 +1141,21 @@ document.addEventListener('click', async (e) => {
 });
 
 // ---------- Leaderboard ----------
+// Categorie-chips i.p.v. 4 losse inklapbare secties: toont steeds 1 categorie tegelijk, onthoudt
+// de laatst gekozen categorie tussen tab-wissels (renderLeaderboard() ververst alleen de inhoud,
+// niet welke #lbCat-* zichtbaar is).
+function switchLbCategory(cat) {
+  document.querySelectorAll('#lbCategoryChips button').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+  ['strength', 'wods', 'skills', 'custom'].forEach(c => {
+    document.getElementById(`lbCat-${c}`).classList.toggle('hidden', c !== cat);
+  });
+}
+document.getElementById('lbCategoryChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  switchLbCategory(btn.dataset.cat);
+});
+
 // benchmarks.value is vrije tekst (mm:ss, "12+4", of een getal) — per score_type naar een
 // vergelijkbare numerieke sleutel omzetten. Onparsbare rijen vallen uit de ranglijst i.p.v.
 // de sortering te laten crashen.
@@ -1102,10 +1185,22 @@ function rankEntries(entries, scoreType) {
     .filter(e => e.key != null)
     .sort((a, b) => lowerIsBetter ? a.key - b.key : b.key - a.key);
 }
-function rankListHtml(ranked, currentUserId) {
+const RANK_MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+// Gedeelde ranglijst-weergave voor alle 4 leaderboard-categorieën (Kracht/WODs/Skills/Eigen WOD's):
+// rang 1-3 krijgen een medaille-emoji i.p.v. een cijfer, "jij" wordt uitgelicht. formatValue laat
+// Skills hetzelfde component hergebruiken met "niveau X" i.p.v. een ruwe waarde.
+function rankListHtml(ranked, currentUserId, formatValue = (e) => e.value) {
   if (!ranked.length) return `<p style="font-size:13px;color:var(--muted);margin-top:4px">Nog geen scores gelogd.</p>`;
-  return `<ol style="margin:6px 0 0 18px;padding:0;font-size:13px">${ranked.map(e => `
-    <li style="${e.userId === currentUserId ? 'font-weight:700' : ''}">${profilesCache[e.userId] || 'Onbekende gebruiker'}${e.userId === currentUserId ? ' (jij)' : ''} — ${e.value}</li>`).join('')}</ol>`;
+  return `<div class="rankList">${ranked.map((e, i) => {
+    const rank = i + 1;
+    const isMe = e.userId === currentUserId;
+    const rankLabel = RANK_MEDALS[rank] || `${rank}.`;
+    return `<div class="rankRow${isMe ? ' me' : ''}">
+      <span class="rankName">${rankLabel} ${profilesCache[e.userId] || 'Onbekende gebruiker'}${isMe ? ' (jij)' : ''}</span>
+      <span class="rankScore">${formatValue(e)}</span>
+    </div>`;
+  }).join('')}</div>`;
 }
 // Per naam/skill de meest recente rij per gebruiker (laatste datum, daarna laatste created_at).
 function latestPerUser(rows) {
@@ -1122,11 +1217,24 @@ function latestPerUser(rows) {
 async function renderLeaderboard() {
   const { data: { user } } = await sb.auth.getUser();
 
+  // Eenmaal ingevuld hoeft dit blok niet steeds volledig zichtbaar te blijven — toon dan een
+  // compacte regel met "wijzig"-knop die pas op klik het invoerveld toont (toggle, zelfde patroon
+  // als de andere inline-formulieren in de app).
   const profileEl = document.getElementById('lbProfile');
-  profileEl.innerHTML = `
-    <label>Jouw naam op het leaderboard</label>
-    <input id="lb_display_name" type="text" value="${profilesCache[user.id] || ''}" placeholder="bv. Bas" />
-    <button type="button" id="lbSaveNameBtn" class="secondary">Opslaan</button>`;
+  const myName = profilesCache[user.id];
+  profileEl.innerHTML = myName
+    ? `<div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+        <p style="margin:0">Jouw naam op het leaderboard: <strong>${myName}</strong></p>
+        <button type="button" id="lbEditNameBtn" class="secondary small" style="flex:none">Wijzig</button>
+      </div>
+      <div id="lbNameForm" class="hidden" style="margin-top:10px">
+        <label>Jouw naam op het leaderboard</label>
+        <input id="lb_display_name" type="text" value="${myName}" placeholder="bv. Bas" />
+        <button type="button" id="lbSaveNameBtn" class="secondary">Opslaan</button>
+      </div>`
+    : `<label>Jouw naam op het leaderboard</label>
+      <input id="lb_display_name" type="text" value="" placeholder="bv. Bas" />
+      <button type="button" id="lbSaveNameBtn" class="secondary">Opslaan</button>`;
 
   // RLS filtert dit al correct: eigen rijen + standaard benchmark/kracht-rijen van iedereen +
   // eigen-WOD-scores voor WOD's die je deelt of die met jou gedeeld zijn.
@@ -1138,7 +1246,7 @@ async function renderLeaderboard() {
     return `<div style="margin:12px 0"><strong>${b.name}</strong>${rankListHtml(ranked, user.id)}</div>`;
   }).join('');
   document.getElementById('lbStrength').innerHTML = buildDefsList('strength') || `<p style="font-size:13px;color:var(--muted)">Geen kracht-benchmarks.</p>`;
-  document.getElementById('lbWods').innerHTML = buildDefsList('wod') || `<p style="font-size:13px;color:var(--muted)">Geen benchmark WODs.</p>`;
+  document.getElementById('lbWods').innerHTML = buildDefsList('wod') || `<p style="font-size:13px;color:var(--muted)">Geen benchmarks.</p>`;
 
   const { data: allProgressions } = await sb.from('skill_progressions').select('*');
   document.getElementById('lbSkills').innerHTML = skillsCache.map(s => {
@@ -1146,11 +1254,7 @@ async function renderLeaderboard() {
       .filter(p => p.skill_id === s.id)
       .map(p => ({ userId: p.user_id, level: p.current_level_number ?? 0 }))
       .sort((a, b) => b.level - a.level);
-    const listHtml = ranked.length
-      ? `<ol style="margin:6px 0 0 18px;padding:0;font-size:13px">${ranked.map(e => `
-          <li style="${e.userId === user.id ? 'font-weight:700' : ''}">${profilesCache[e.userId] || 'Onbekende gebruiker'}${e.userId === user.id ? ' (jij)' : ''} — niveau ${e.level + 1}</li>`).join('')}</ol>`
-      : `<p style="font-size:13px;color:var(--muted);margin-top:4px">Nog geen voortgang gelogd.</p>`;
-    return `<div style="margin:12px 0"><strong>${s.name}</strong>${listHtml}</div>`;
+    return `<div style="margin:12px 0"><strong>${s.name}</strong>${rankListHtml(ranked, user.id, (e) => `niveau ${e.level + 1}`)}</div>`;
   }).join('');
 
   await renderCustomWodLeaderboard(user, benchmarks);
@@ -1184,7 +1288,7 @@ async function renderCustomWodLeaderboard(user, benchmarks) {
       </div>` : ''}
     </div>`;
     return row + shareMgmt;
-  }).join('') : `<p style="font-size:13px;color:var(--muted)">Je hebt nog geen eigen WOD's (voeg toe via Dashboard).</p>`;
+  }).join('') : `<p style="font-size:13px;color:var(--muted)">Je hebt nog geen custom WODs (voeg toe via Dashboard).</p>`;
 
   const validShares = (sharedWithMe || []).filter(s => s.custom_wods);
   const sharedHtml = validShares.length ? validShares.map(s => {
@@ -1196,7 +1300,7 @@ async function renderCustomWodLeaderboard(user, benchmarks) {
     });
   }).join('') : `<p style="font-size:13px;color:var(--muted)">Nog niemand heeft een WOD met jou gedeeld.</p>`;
 
-  el.innerHTML = `<h4 style="margin:14px 0 4px">Jouw eigen WOD's</h4>${ownHtml}<h4 style="margin:18px 0 4px">Met jou gedeeld</h4>${sharedHtml}`;
+  el.innerHTML = `<h4 style="margin:14px 0 4px">Jouw custom WODs</h4>${ownHtml}<h4 style="margin:18px 0 4px">Met jou gedeeld</h4>${sharedHtml}`;
 }
 
 // ---------- Log ----------
