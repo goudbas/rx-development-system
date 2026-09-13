@@ -820,3 +820,26 @@ insert into benchmark_definitions (name, category, workout_description, score_ty
 on conflict (name) do update set
   category = excluded.category, workout_description = excluded.workout_description,
   score_type = excluded.score_type, unit = excluded.unit, sort_order = excluded.sort_order;
+
+-- ============ Migratie: eigen WOD's (persoonlijk, niet in de gedeelde benchmark_definitions-lijst) ============
+-- Scores voor een eigen WOD gaan gewoon in de bestaande `benchmarks`-tabel (matcht op `name`,
+-- al user_id-gescoped) — dezelfde insert-flow als de vaste WOD's, geen wijziging daar nodig.
+create table if not exists custom_wods (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id),
+  name text not null,
+  workout_description text,
+  score_type text not null default 'time' check (score_type in ('time','reps','rounds_reps')),
+  unit text,
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+alter table custom_wods enable row level security;
+drop policy if exists "owner_select" on custom_wods;
+drop policy if exists "owner_insert" on custom_wods;
+drop policy if exists "owner_update" on custom_wods;
+drop policy if exists "owner_delete" on custom_wods;
+create policy "owner_select" on custom_wods for select using (auth.uid() = user_id);
+create policy "owner_insert" on custom_wods for insert with check (auth.uid() = user_id);
+create policy "owner_update" on custom_wods for update using (auth.uid() = user_id);
+create policy "owner_delete" on custom_wods for delete using (auth.uid() = user_id);

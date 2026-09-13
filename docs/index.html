@@ -175,9 +175,38 @@
       <div id="strengthList">Laden...</div>
     </div>
     <div class="card">
-      <h3>Benchmark WODs</h3>
-      <p style="font-size:13px;margin-top:-4px">Tik op een WOD om een score te loggen.</p>
-      <div id="wodList">Laden...</div>
+      <details style="margin-top:0">
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Benchmark WODs</summary>
+        <div class="detail-body">
+          <p style="font-size:13px;margin-top:-4px">Tik op een WOD om een score te loggen.</p>
+          <div id="wodList">Laden...</div>
+        </div>
+      </details>
+    </div>
+    <div class="card">
+      <details style="margin-top:0">
+        <summary style="font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:1.17em;font-weight:600;color:var(--text)">Eigen WOD's</summary>
+        <div class="detail-body">
+          <p style="font-size:13px;margin-top:-4px">Je eigen WOD's, los van de vaste lijst hierboven.</p>
+          <div id="customWodList">Laden...</div>
+          <details style="margin-top:10px">
+            <summary style="font-size:13px">+ Eigen WOD toevoegen</summary>
+            <div class="detail-body">
+              <label>Naam</label>
+              <input id="cw_name" type="text" placeholder="bv. Box WOD 3" />
+              <label>Omschrijving</label>
+              <input id="cw_description" type="text" placeholder="bv. 5 ronden: 10 burpees, 15 KB swings" />
+              <label>Score-type</label>
+              <select id="cw_score_type">
+                <option value="time">Tijd</option>
+                <option value="reps">Reps</option>
+                <option value="rounds_reps">Ronden + reps</option>
+              </select>
+              <button type="button" id="addCustomWodBtn">WOD toevoegen</button>
+            </div>
+          </details>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -185,8 +214,8 @@
     <h2>Training log</h2>
     <div class="card">
       <table>
-        <thead><tr><th>Datum</th><th>Type</th><th>Detail</th></tr></thead>
-        <tbody id="logRows"><tr><td colspan="3">Laden...</td></tr></tbody>
+        <thead><tr><th>Datum</th><th>Type</th><th>Detail</th><th></th></tr></thead>
+        <tbody id="logRows"><tr><td colspan="4">Laden...</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -428,6 +457,7 @@ function frozenSkillNames() {
   return skillsCache.filter(s => frozenCache[s.id]?.frozen).map(s => s.name);
 }
 let benchmarkDefsCache = [];
+let customWodsCache = []; // eigen WOD's van deze gebruiker, apart van de gedeelde benchmark_definitions-lijst
 
 // ---------- Auth ----------
 async function init() {
@@ -443,11 +473,11 @@ function showLogin() {
   document.getElementById('app').classList.add('hidden');
   document.getElementById('navbar').classList.add('hidden');
 }
-function showApp() {
+async function showApp() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('navbar').classList.remove('hidden');
-  loadSkills();
+  await loadSkills();
   switchTab('today');
 }
 
@@ -471,6 +501,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
   document.getElementById('tab-' + tab).classList.remove('hidden');
   document.querySelectorAll('#navbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'today') renderToday();
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'log') renderLog();
   if (tab === 'skills') renderSkills();
@@ -578,15 +609,24 @@ async function logPostClass() {
   const { data: { user } } = await sb.auth.getUser();
   const today = localDateStr();
 
-  const { data: session, error: sErr } = await sb.from('training_sessions')
-    .insert({ user_id: user.id, date: today, session_type: 'class' }).select().single();
-  if (sErr) { out.textContent = sErr.message; return; }
+  // Hergebruik de class-sessie van vandaag als die al bestaat, zodat opnieuw loggen overschrijft
+  // i.p.v. een dubbele sessie in de Log-tab aanmaakt.
+  const { data: existing } = await sb.from('training_sessions').select('id')
+    .eq('user_id', user.id).eq('date', today).eq('session_type', 'class')
+    .order('created_at', { ascending: false }).limit(1);
+  let sessionId = existing?.[0]?.id;
+  if (!sessionId) {
+    const { data: session, error: sErr } = await sb.from('training_sessions')
+      .insert({ user_id: user.id, date: today, session_type: 'class' }).select().single();
+    if (sErr) { out.textContent = sErr.message; return; }
+    sessionId = session.id;
+  }
   const clPayload = {
-    user_id: user.id, training_session_id: session.id,
+    user_id: user.id, training_session_id: sessionId,
     rpe: todayState.rpe, workout_type: todayState.workout_type,
     overall_load: rpeToOverallLoad(todayState.rpe)
   };
-  const { error: clErr } = await sb.from('class_loads').insert(clPayload);
+  const { error: clErr } = await sb.from('class_loads').upsert(clPayload, { onConflict: 'training_session_id' });
   if (clErr) { out.textContent = clErr.message; return; }
 
   await renderPostClassRecommendation(clPayload, true);
@@ -649,6 +689,68 @@ async function logCoachRecommendation(userId, result) {
   });
 }
 
+// ---------- Today: rehydrateren bij openen (log + advies van vandaag blijven zichtbaar, en aanpasbaar) ----------
+function setChipState(field, value) {
+  const group = document.querySelector(`#tab-today .chip-group[data-field="${field}"]`);
+  if (!group) return;
+  group.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.value === String(value ?? ' ')));
+}
+function setChipStateMulti(field, values) {
+  const group = document.querySelector(`#tab-today .chip-group[data-field="${field}"]`);
+  if (!group) return;
+  const set = new Set((values || []).map(String));
+  group.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', set.has(c.dataset.value)));
+}
+
+async function getTodayClassLoad(userId) {
+  const today = localDateStr();
+  const { data } = await sb.from('training_sessions').select('id, class_loads(*)')
+    .eq('user_id', userId).eq('date', today).eq('session_type', 'class')
+    .order('created_at', { ascending: false }).limit(1);
+  return data?.[0]?.class_loads?.[0] || null;
+}
+
+async function renderToday() {
+  const { data: { user } } = await sb.auth.getUser();
+
+  const { data: log } = await sb.from('daily_logs').select('*').eq('user_id', user.id).eq('date', localDateStr()).maybeSingle();
+  todayState.readiness = log?.readiness != null ? String(log.readiness) : null;
+  todayState.fatigue = log?.fatigue != null ? String(log.fatigue) : null;
+  todayState.soreness = log?.soreness != null ? String(log.soreness) : null;
+  todayState.sleep = log?.sleep != null ? String(log.sleep) : null;
+  todayState.pain_level = log?.pain_level || 'none';
+  todayState.pain_location = log?.pain_location || '';
+  todayState.sore_muscle_groups = log?.sore_muscle_groups || [];
+  setChipState('readiness', todayState.readiness);
+  setChipState('fatigue', todayState.fatigue);
+  setChipState('soreness', todayState.soreness);
+  setChipState('sleep', todayState.sleep);
+  setChipState('pain_level', todayState.pain_level);
+  setChipStateMulti('sore_muscle_groups', todayState.sore_muscle_groups);
+  const painLocEl = document.getElementById('today_pain_location');
+  painLocEl.value = todayState.pain_location;
+  painLocEl.classList.toggle('hidden', todayState.pain_level === 'none');
+
+  if (log) {
+    await renderPreClassRecommendation(false);
+  } else {
+    document.getElementById('recommendationPre').textContent = 'Vul hierboven in voor je pre-class skill-advies.';
+  }
+
+  const cl = await getTodayClassLoad(user.id);
+  todayState.rpe = cl?.rpe != null ? Number(cl.rpe) : 5;
+  todayState.workout_type = cl?.workout_type || null;
+  document.getElementById('today_rpe').value = todayState.rpe;
+  document.getElementById('today_rpe_val').textContent = todayState.rpe;
+  setChipState('workout_type', todayState.workout_type);
+
+  if (cl) {
+    await renderPostClassRecommendation(cl, false);
+  } else {
+    document.getElementById('recommendationPost').textContent = 'Log hierboven de class voor je post-class advies.';
+  }
+}
+
 async function getActiveBlock(userId) {
   const { data } = await sb.from('training_blocks').select('*').eq('user_id', userId).eq('status', 'active').order('start_date', { ascending: false }).limit(1).maybeSingle();
   return data;
@@ -680,6 +782,21 @@ function wodInlineFormHtml(scoreType) {
 }
 
 // ---------- Dashboard ----------
+document.getElementById('addCustomWodBtn').addEventListener('click', async () => {
+  const name = document.getElementById('cw_name').value.trim();
+  if (!name) { alert('Vul een naam in.'); return; }
+  const workout_description = document.getElementById('cw_description').value.trim() || null;
+  const score_type = document.getElementById('cw_score_type').value;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('custom_wods').insert({ user_id: user.id, name, workout_description, score_type });
+  if (error) { alert(error.message); return; }
+  document.getElementById('cw_name').value = '';
+  document.getElementById('cw_description').value = '';
+  const { data: customWodsData } = await sb.from('custom_wods').select('*').eq('user_id', user.id).order('name');
+  customWodsCache = customWodsData || [];
+  renderDashboard();
+});
+
 async function renderDashboard() {
   const { data: { user } } = await sb.auth.getUser();
   const { data: benchmarks } = await sb.from('benchmarks').select('*').eq('user_id', user.id)
@@ -746,14 +863,23 @@ async function renderDashboard() {
   // Benchmark WODs: puur registratie + korte geschiedenis, geen RX-tiers/PR-badge (tijd vs.
   // reps zijn niet 1-op-1 vergelijkbaar) — history komt uit de al opgehaalde `benchmarks`-array.
   const wodEl = document.getElementById('wodList');
-  wodEl.innerHTML = benchmarkDefsCache.filter(b => b.category === 'wod').map(b => {
-    const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
-    const latest = history[0];
-    const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
-    const historyHtml = history.length
-      ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
-      : `<p style="font-size:13px;color:var(--muted);margin-top:6px">Nog niet gelogd.</p>`;
-    return `
+  wodEl.innerHTML = benchmarkDefsCache.filter(b => b.category === 'wod').map(b => wodRowHtml(b, benchmarks, false)).join('');
+
+  // Eigen WOD's: zelfde weergave/logica, maar user-scoped i.p.v. de gedeelde lijst, en verwijderbaar.
+  const customWodEl = document.getElementById('customWodList');
+  customWodEl.innerHTML = customWodsCache.length
+    ? customWodsCache.map(b => wodRowHtml(b, benchmarks, true)).join('')
+    : `<p style="font-size:13px;color:var(--muted)">Nog geen eigen WOD's toegevoegd.</p>`;
+}
+
+function wodRowHtml(b, benchmarks, isCustom) {
+  const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
+  const latest = history[0];
+  const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
+  const historyHtml = history.length
+    ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
+    : `<p style="font-size:13px;color:var(--muted);margin-top:6px">Nog niet gelogd.</p>`;
+  return `
     <div class="benchmarkRow" data-name="${b.name}" style="margin:12px 0;cursor:pointer">
       <div class="row" style="justify-content:space-between">
         <strong>${b.name}</strong>
@@ -762,8 +888,8 @@ async function renderDashboard() {
       <p style="font-size:13px;margin:4px 0 0">${b.workout_description || ''}</p>
       ${historyHtml}
       ${wodInlineFormHtml(b.score_type)}
+      ${isCustom ? `<button type="button" class="secondary small deleteCustomWodBtn" data-id="${b.id}" style="margin-top:8px">Verwijder eigen WOD</button>` : ''}
     </div>`;
-  }).join('');
 }
 
 // Tik op een RX-Readiness-rij (skill of lift) om er een inline invoer voor te openen/sluiten.
@@ -816,6 +942,15 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  const deleteCwBtn = e.target.closest('.deleteCustomWodBtn');
+  if (deleteCwBtn) {
+    if (!confirm('Deze eigen WOD verwijderen? Eerder gelogde scores blijven staan in de Log-tab.')) return;
+    await sb.from('custom_wods').delete().eq('id', deleteCwBtn.dataset.id);
+    customWodsCache = customWodsCache.filter(w => w.id !== deleteCwBtn.dataset.id);
+    renderDashboard();
+    return;
+  }
+
   if (e.target.closest('.bmInlineForm') || e.target.closest('.wodInlineForm')) return;
   const bmRow = e.target.closest('.benchmarkRow');
   if (bmRow) {
@@ -827,7 +962,7 @@ document.addEventListener('click', async (e) => {
 // ---------- Log ----------
 async function renderLog() {
   const { data: { user } } = await sb.auth.getUser();
-  const { data: sessions } = await sb.from('training_sessions').select('*, class_loads(overall_load), skill_sessions(step, skills(name)), strength_sessions(exercise)')
+  const { data: sessions } = await sb.from('training_sessions').select('id, date, session_type, class_loads(overall_load), skill_sessions(step, skills(name)), strength_sessions(exercise)')
     .eq('user_id', user.id).order('date', { ascending: false }).limit(20);
   const { data: logs } = await sb.from('daily_logs').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(20);
   const rows = [];
@@ -836,14 +971,31 @@ async function renderLog() {
     if (s.class_loads?.[0]?.overall_load) detail += ` (${s.class_loads[0].overall_load})`;
     if (s.skill_sessions?.length) detail += ' — ' + s.skill_sessions.map(x => x.skills?.name).join(', ');
     if (s.strength_sessions?.length) detail += ' — ' + s.strength_sessions.map(x => x.exercise).join(', ');
-    rows.push({ date: s.date, type: 'sessie', detail });
+    rows.push({ date: s.date, type: 'sessie', detail, table: 'training_sessions', id: s.id });
   });
-  (logs || []).forEach(l => rows.push({ date: l.date, type: 'readiness', detail: `R${l.readiness ?? '-'} F${l.fatigue ?? '-'} S${l.soreness ?? '-'} slaap${l.sleep ?? '-'} pijn:${l.pain_level ?? '-'}` }));
+  (logs || []).forEach(l => rows.push({
+    date: l.date, type: 'readiness',
+    detail: `R${l.readiness ?? '-'} F${l.fatigue ?? '-'} S${l.soreness ?? '-'} slaap${l.sleep ?? '-'} pijn:${l.pain_level ?? '-'}`,
+    table: 'daily_logs', id: l.id
+  }));
   rows.sort((a, b) => b.date.localeCompare(a.date));
   document.getElementById('logRows').innerHTML = rows.length
-    ? rows.map(r => `<tr><td>${r.date}</td><td>${r.type}</td><td>${r.detail}</td></tr>`).join('')
-    : '<tr><td colspan="3">Nog geen data.</td></tr>';
+    ? rows.map(r => `<tr><td>${r.date}</td><td>${r.type}</td><td>${r.detail}</td>
+        <td><button type="button" class="secondary small deleteLogRowBtn" data-table="${r.table}" data-id="${r.id}">Verwijder</button></td></tr>`).join('')
+    : '<tr><td colspan="4">Nog geen data.</td></tr>';
 }
+
+// Verwijdert een log-regel (bv. per ongeluk op "Log & advies" geklikt). Sessie-verwijdering cascadet
+// naar class_loads/skill_sessions/strength_sessions via de FK (zie schema.sql); herlaadt Today erna
+// zodat een verwijderde log van vandaag ook daar direct terugvalt op de lege staat.
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.deleteLogRowBtn');
+  if (!btn) return;
+  if (!confirm('Deze log-regel verwijderen? Dit kan niet ongedaan gemaakt worden.')) return;
+  await sb.from(btn.dataset.table).delete().eq('id', btn.dataset.id);
+  await renderLog();
+  if (!document.getElementById('tab-today').classList.contains('hidden')) renderToday();
+});
 
 // ---------- Skills ----------
 async function loadSkills() {
@@ -854,6 +1006,8 @@ async function loadSkills() {
   const { data: levelsData } = await sb.from('skill_levels').select('*').order('level_number');
   const { data: benchmarkDefsData } = await sb.from('benchmark_definitions').select('*').order('sort_order');
   benchmarkDefsCache = benchmarkDefsData || [];
+  const { data: customWodsData } = await sb.from('custom_wods').select('*').eq('user_id', user.id).order('name');
+  customWodsCache = customWodsData || [];
   const { data: progressions } = await sb.from('skill_progressions').select('*').eq('user_id', user.id);
   progressionsCache = {};
   frozenCache = {};
