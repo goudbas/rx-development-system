@@ -922,7 +922,7 @@ async function renderDashboard() {
 }
 
 function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
-  const { deletable = isCustom, ownerLabel = null, isNew = false, shareId = null, rankHtml = '' } = extra;
+  const { deletable = isCustom, ownerLabel = null, isNew = false, shareId = null, rankHtml = '', leaveShareId = null } = extra;
   const history = (benchmarks || []).filter(x => x.name === b.name).slice(0, 3);
   const latest = history[0];
   const rxLabel = (h) => h.rx === true ? ' (Rx)' : h.rx === false ? ' (Scaled)' : '';
@@ -930,6 +930,14 @@ function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
   const historyHtml = history.length
     ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted)">${history.map(h => `<li>${h.date}: ${h.value}${rxLabel(h)}</li>`).join('')}</ul>`
     : '';
+  // Acties: eigen laatst gelogde score verwijderen (ook op gedeelde/andermans WOD's — het is altijd
+  // jouw eigen rij, `benchmarks` hier is al user-gescoped), eigen WOD-definitie verwijderen (alleen
+  // eigenaar), of jezelf uit een met-jou-gedeelde WOD verwijderen.
+  const actionsHtml = [
+    latest ? `<button type="button" class="secondary small deleteWodScoreBtn" data-benchmark-id="${latest.id}" style="margin:0;flex:none">Verwijder mijn score</button>` : '',
+    deletable ? `<button type="button" class="secondary small deleteCustomWodBtn" data-id="${b.id}" style="margin:0;flex:none">Verwijder eigen WOD</button>` : '',
+    leaveShareId ? `<button type="button" class="secondary small removeShareBtn leaveShareBtn" data-share-id="${leaveShareId}" style="margin:0;flex:none">Verlaat gedeelde WOD</button>` : ''
+  ].filter(Boolean).join('');
   return `
     <div class="benchmarkRow" data-name="${b.name}" data-wod-id="${b.id}" data-custom="${isCustom ? '1' : '0'}"${shareId ? ` data-share-id="${shareId}"` : ''} style="margin:12px 0;cursor:pointer">
       <div class="row" style="justify-content:space-between">
@@ -940,7 +948,7 @@ function wodRowHtml(b, benchmarks, isCustom, extra = {}) {
       <p style="font-size:13px;margin:4px 0 0">${b.workout_description || ''}</p>
       ${rankHtml || historyHtml}
       ${wodInlineFormHtml(b.score_type)}
-      ${deletable ? `<button type="button" class="secondary small deleteCustomWodBtn" data-id="${b.id}" style="margin-top:8px">Verwijder eigen WOD</button>` : ''}
+      ${actionsHtml ? `<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">${actionsHtml}</div>` : ''}
     </div>`;
 }
 
@@ -1006,6 +1014,17 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  const deleteWodScoreBtn = e.target.closest('.deleteWodScoreBtn');
+  if (deleteWodScoreBtn) {
+    if (!confirm('Deze score verwijderen? Dit kan niet ongedaan gemaakt worden.')) return;
+    const row = deleteWodScoreBtn.closest('.benchmarkRow');
+    const onLeaderboard = !!row.closest('#tab-leaderboard');
+    const { error } = await sb.from('benchmarks').delete().eq('id', deleteWodScoreBtn.dataset.benchmarkId);
+    if (error) { alert(error.message); return; }
+    if (onLeaderboard) renderLeaderboard(); else renderDashboard();
+    return;
+  }
+
   const lbSaveNameBtn = e.target.closest('#lbSaveNameBtn');
   if (lbSaveNameBtn) {
     const name = document.getElementById('lb_display_name').value.trim();
@@ -1030,7 +1049,10 @@ document.addEventListener('click', async (e) => {
 
   const removeShareBtn = e.target.closest('.removeShareBtn');
   if (removeShareBtn) {
-    await sb.from('custom_wod_shares').delete().eq('id', removeShareBtn.dataset.shareId);
+    const isLeaving = removeShareBtn.classList.contains('leaveShareBtn');
+    if (!confirm(isLeaving ? 'Deze gedeelde WOD verlaten? Je ziet hem daarna niet meer terug.' : 'Delen met deze gebruiker stopzetten?')) return;
+    const { error } = await sb.from('custom_wod_shares').delete().eq('id', removeShareBtn.dataset.shareId);
+    if (error) { alert(error.message); return; }
     renderLeaderboard();
     return;
   }
@@ -1170,7 +1192,7 @@ async function renderCustomWodLeaderboard(user, benchmarks) {
     const entries = latestPerUser((benchmarks || []).filter(b => b.custom_wod_id === wod.id)).map(r => ({ userId: r.user_id, value: r.value }));
     const ranked = rankEntries(entries, wod.score_type);
     return wodRowHtml(wod, myBenchmarks, true, {
-      deletable: false, ownerLabel: profilesCache[wod.user_id], isNew: !s.seen_at, shareId: s.id, rankHtml: rankListHtml(ranked, user.id)
+      deletable: false, ownerLabel: profilesCache[wod.user_id], isNew: !s.seen_at, shareId: s.id, rankHtml: rankListHtml(ranked, user.id), leaveShareId: s.id
     });
   }).join('') : `<p style="font-size:13px;color:var(--muted)">Nog niemand heeft een WOD met jou gedeeld.</p>`;
 

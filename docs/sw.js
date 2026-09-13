@@ -1,4 +1,4 @@
-const CACHE = 'rx-dev-v26';
+const CACHE = 'rx-dev-v27';
 const SHELL = ['./', './index.html', './decision-engine.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {

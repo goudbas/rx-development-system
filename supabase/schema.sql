@@ -932,3 +932,8 @@ drop policy if exists "owner_delete" on custom_wod_shares;
 create policy "owner_select" on custom_wod_shares for select using (is_custom_wod_owner(wod_id));
 create policy "owner_insert" on custom_wod_shares for insert with check (is_custom_wod_owner(wod_id));
 create policy "owner_delete" on custom_wod_shares for delete using (is_custom_wod_owner(wod_id));
+
+-- ============ Uitgenodigde kan zichzelf uit een gedeelde WOD verwijderen ============
+-- Tot nu toe kon alleen de eigenaar (owner_delete) een share-rij verwijderen; de uitgenodigde
+-- gebruiker had geen manier om een WOD die met hem/haar gedeeld is zelf te "verlaten".
+create policy "invitee_delete" on custom_wod_shares for delete using (auth.uid() = shared_with_user_id);
